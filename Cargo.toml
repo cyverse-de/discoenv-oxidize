@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+	"user-info",
+	"service_errors",
+	"service_signals",
+]

@@ -1,0 +1,12 @@
+[package]
+name = "service_errors"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.69"
+axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipart", "ws"] }
+debuff = { git = "https://github.com/cyverse-de/p", rev="b5e22577adef1a91b80ce3f468124fcdbeecc37d" }
+thiserror = "1.0.39"
