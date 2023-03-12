@@ -1,0 +1,22 @@
+{
+  "query": "insert into bags (user_id, contents) values ($1, $2) returning id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Json"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d7d9b1b762a1e31ffaafb730ed966724f7f95be46ec0847f03a6ebbf05f05ac6"
+}
