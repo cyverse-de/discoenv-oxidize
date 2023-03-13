@@ -49,23 +49,7 @@ pub async fn list_user_bags(conn: &PgPool, username: &str) -> Result<Bags, sqlx:
     Ok(Bags { bags })
 }
 
-pub async fn update_bag_contents(
-    conn: &PgPool,
-    id: Uuid,
-    contents: Map<String, JsonValue>,
-) -> Result<u64, sqlx::Error> {
-    let result = query!(
-        r#"update bags set contents = $2 where id = $1"#,
-        id,
-        JsonValue::Object(contents)
-    )
-    .execute(conn)
-    .await?;
-
-    Ok(result.rows_affected())
-}
-
-pub async fn add_bag(
+pub async fn add_user_bag(
     conn: &PgPool,
     username: &str,
     contents: Map<String, JsonValue>,
@@ -81,4 +65,20 @@ pub async fn add_bag(
     .await?;
 
     Ok(result.id)
+}
+
+pub async fn update_bag_contents(
+    conn: &PgPool,
+    id: Uuid,
+    contents: Map<String, JsonValue>,
+) -> Result<u64, sqlx::Error> {
+    let result = query!(
+        r#"update bags set contents = $2 where id = $1"#,
+        id,
+        JsonValue::Object(contents)
+    )
+    .execute(conn)
+    .await?;
+
+    Ok(result.rows_affected())
 }

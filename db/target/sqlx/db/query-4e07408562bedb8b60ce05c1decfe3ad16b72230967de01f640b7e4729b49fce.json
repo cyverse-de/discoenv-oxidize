@@ -1,22 +1,14 @@
 {
-  "query": "insert into bags (user_id, contents) values ($1, $2) returning id",
+  "query": "update bags set contents = $2 where id = $1",
   "describe": {
-    "columns": [
-      {
-        "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
-      }
-    ],
+    "columns": [],
     "parameters": {
       "Left": [
         "Uuid",
         "Json"
       ]
     },
-    "nullable": [
-      false
-    ]
+    "nullable": []
   },
-  "hash": "d7d9b1b762a1e31ffaafb730ed966724f7f95be46ec0847f03a6ebbf05f05ac6"
+  "hash": "6f9196b552ef6f00ab6fe178f358201a23550b16bb5394c8f83ea26bf89e6084"
 }

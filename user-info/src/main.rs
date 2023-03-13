@@ -7,11 +7,16 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
+use db::bags;
 use db::bags::{list_user_bags, Bags};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_json::Map;
 use service_errors::DiscoError;
 use service_signals::shutdown_signal;
-use sqlx::postgres::PgPool;
+use sqlx::{
+    postgres::PgPool,
+    types::{JsonValue, Uuid},
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -19,6 +24,11 @@ struct Cli {
     #[arg(short, long)]
     /// The connection string for the database in the format postgres:://user:password@host:port/database
     database_url: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct ID {
+    id: Uuid,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,6 +49,16 @@ async fn get_user_bags(
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
 ) -> response::Result<Json<Bags>, DiscoError> {
     Ok(Json(list_user_bags(&conn, &username).await?))
+}
+
+async fn add_user_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Json(bag): Json<Map<String, JsonValue>>,
+) -> response::Result<Json<ID>, DiscoError> {
+    let u = bags::add_user_bag(&conn, &username, bag).await?;
+    let b = ID { id: u };
+    Ok(Json(b))
 }
 
 #[tokio::main]
@@ -66,7 +86,7 @@ async fn main() {
             "/:username",
             get(get_user_bags)
                 .head(|| async {})
-                .put(|| async {})
+                .put(add_user_bag)
                 .delete(|| async {}),
         )
         .route(
