@@ -1,22 +1,33 @@
 {
-  "query": "insert into bags (user_id, contents) values ($1, $2) returning id",
+  "query": "\n            select \n                bags.id, \n                user_id, \n                contents as \"contents: Json<Map<String, JsonValue>>\" \n            from bags\n            join users on users.id = bags.user_id \n            where users.username = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
         "name": "id",
         "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "contents: Json<Map<String, JsonValue>>",
+        "type_info": "Json"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Json"
+        "Text"
       ]
     },
     "nullable": [
+      false,
+      false,
       false
     ]
   },
-  "hash": "d7d9b1b762a1e31ffaafb730ed966724f7f95be46ec0847f03a6ebbf05f05ac6"
+  "hash": "8c0d2facae6c05ac961da9c5ccd2f4da99f293b63487c0ba5a8e724a2b40b473"
 }

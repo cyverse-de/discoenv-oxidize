@@ -6,7 +6,7 @@ use sqlx::{
     PgPool,
 };
 
-use anyhow::Result;
+use crate::users;
 
 #[derive(Serialize, Deserialize)]
 pub struct Bag {
@@ -15,7 +15,12 @@ pub struct Bag {
     pub contents: Json<Map<String, JsonValue>>,
 }
 
-pub async fn list_bags(conn: &PgPool) -> Result<Vec<Bag>> {
+#[derive(Serialize, Deserialize)]
+pub struct Bags {
+    pub bags: Vec<Bag>,
+}
+
+pub async fn list_bags(conn: &PgPool) -> Result<Vec<Bag>, sqlx::Error> {
     Ok(query_as!(
         Bag,
         r#"select id, user_id, contents as "contents: Json<Map<String, JsonValue>>" from bags"#
@@ -24,21 +29,31 @@ pub async fn list_bags(conn: &PgPool) -> Result<Vec<Bag>> {
     .await?)
 }
 
-pub async fn list_user_bags(conn: &PgPool, user_id: Uuid) -> Result<Vec<Bag>> {
-    Ok(query_as!(
+pub async fn list_user_bags(conn: &PgPool, username: &str) -> Result<Bags, sqlx::Error> {
+    let bags = query_as!(
         Bag,
-        r#"select id, user_id, contents as "contents: Json<Map<String, JsonValue>>" from bags where user_id = $1"#,
-        user_id
+        r#"
+            select 
+                bags.id, 
+                user_id, 
+                contents as "contents: Json<Map<String, JsonValue>>" 
+            from bags
+            join users on users.id = bags.user_id 
+            where users.username = $1
+        "#,
+        username
     )
     .fetch_all(conn)
-    .await?)
+    .await?;
+
+    Ok(Bags { bags })
 }
 
 pub async fn update_bag_contents(
     conn: &PgPool,
     id: Uuid,
     contents: Map<String, JsonValue>,
-) -> Result<u64> {
+) -> Result<u64, sqlx::Error> {
     let result = query!(
         r#"update bags set contents = $2 where id = $1"#,
         id,
@@ -52,9 +67,11 @@ pub async fn update_bag_contents(
 
 pub async fn add_bag(
     conn: &PgPool,
-    user_id: Uuid,
+    username: &str,
     contents: Map<String, JsonValue>,
-) -> Result<Uuid> {
+) -> Result<Uuid, sqlx::Error> {
+    let user_id = users::user_id(&conn, username).await?;
+
     let result = query!(
         r#"insert into bags (user_id, contents) values ($1, $2) returning id"#,
         user_id,
