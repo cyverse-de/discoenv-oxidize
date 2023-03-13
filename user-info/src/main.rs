@@ -1,6 +1,7 @@
 use anyhow::Context;
 use axum::{
     extract::{Json, Path, State},
+    http::StatusCode,
     response,
     routing::get,
     Router,
@@ -61,6 +62,26 @@ async fn add_user_bag(
     Ok(Json(b))
 }
 
+async fn delete_user_bags(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+) -> response::Result<(), DiscoError> {
+    bags::delete_user_bag(&conn, &username).await?;
+    Ok(())
+}
+
+async fn user_has_bags(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+) -> response::Result<StatusCode, DiscoError> {
+    let mut status_code = StatusCode::OK;
+    let has_bag = bags::user_has_bags(&conn, &username).await?;
+    if !has_bag {
+        status_code = StatusCode::NOT_FOUND
+    }
+    status_code
+}
+
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
@@ -85,9 +106,9 @@ async fn main() {
         .route(
             "/:username",
             get(get_user_bags)
-                .head(|| async {})
+                .head(user_has_bags)
                 .put(add_user_bag)
-                .delete(|| async {}),
+                .delete(delete_user_bags),
         )
         .route(
             "/:username/default",

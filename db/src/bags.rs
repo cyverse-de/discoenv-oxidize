@@ -67,6 +67,34 @@ pub async fn add_user_bag(
     Ok(result.id)
 }
 
+pub async fn delete_user_bag(conn: &PgPool, username: &str) -> Result<u64, sqlx::Error> {
+    let user_id = users::user_id(&conn, username).await?;
+    let result = query!(r#"delete from bags where user_id = $1"#, user_id)
+        .execute(conn)
+        .await?;
+
+    Ok(result.rows_affected())
+}
+
+struct HasBags {
+    has_bags: Option<bool>,
+}
+
+pub async fn user_has_bags(conn: &PgPool, username: &str) -> Result<bool, sqlx::Error> {
+    let user_id = users::user_id(&conn, username).await?;
+    let result = query_as!(
+        HasBags,
+        r#"
+            select COUNT(*) > 0 as has_bags from bags where user_id = $1
+        "#,
+        user_id,
+    )
+    .fetch_one(conn)
+    .await?;
+
+    Ok(result.has_bags.unwrap_or(false))
+}
+
 pub async fn update_bag_contents(
     conn: &PgPool,
     id: Uuid,

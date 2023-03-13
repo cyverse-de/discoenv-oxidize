@@ -1,14 +1,13 @@
 {
-  "query": "update bags set contents = $2 where id = $1",
+  "query": "delete from bags where user_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Json"
+        "Uuid"
       ]
     },
     "nullable": []
   },
-  "hash": "6f9196b552ef6f00ab6fe178f358201a23550b16bb5394c8f83ea26bf89e6084"
+  "hash": "277cf3ce1765cad8bdeba75354e4b99ca5be768b78fdcd3991d88a8ec4afa93c"
 }
