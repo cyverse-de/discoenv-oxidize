@@ -79,7 +79,7 @@ async fn user_has_bags(
     if !has_bag {
         status_code = StatusCode::NOT_FOUND
     }
-    status_code
+    Ok(status_code)
 }
 
 #[tokio::main]
