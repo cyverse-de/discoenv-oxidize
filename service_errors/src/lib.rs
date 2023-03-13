@@ -98,6 +98,16 @@ impl From<ServiceError> for DiscoError {
     }
 }
 
+impl From<sqlx::Error> for DiscoError {
+    fn from(s: sqlx::Error) -> Self {
+        let msg = s.to_string().clone();
+        match s {
+            sqlx::Error::RowNotFound => DiscoError::NotFound(msg),
+            _ => DiscoError::Internal(msg),
+        }
+    }
+}
+
 impl From<DiscoError> for ServiceError {
     fn from(d: DiscoError) -> Self {
         let error_code: i32 = d.error_code().into();

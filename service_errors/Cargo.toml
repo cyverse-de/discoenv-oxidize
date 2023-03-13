@@ -9,4 +9,5 @@ edition = "2021"
 anyhow = "1.0.69"
 axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipart", "ws"] }
 debuff = { git = "https://github.com/cyverse-de/p", rev="b5e22577adef1a91b80ce3f468124fcdbeecc37d" }
+sqlx = "0.6.2"
 thiserror = "1.0.39"
