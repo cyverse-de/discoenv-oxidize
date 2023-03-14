@@ -8,7 +8,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::bags;
+use db::bags::{self, Bag};
 use db::bags::{list_user_bags, Bags};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -28,8 +28,8 @@ struct Cli {
 }
 
 #[derive(Serialize, Deserialize)]
-struct ID {
-    id: Uuid,
+pub struct ID {
+    pub id: Uuid,
 }
 
 #[derive(Debug, Serialize)]
@@ -82,6 +82,43 @@ async fn user_has_bags(
     Ok(status_code)
 }
 
+async fn get_default_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    if !bags::has_default_bag(&conn, &username).await? {
+        let new_bag: Map<String, JsonValue> = Map::new();
+        let new_bag_uuid = bags::add_user_bag(&conn, &username, new_bag).await?;
+        bags::set_default_bag(&conn, &username, new_bag_uuid).await?;
+    }
+
+    Ok(Json(bags::get_default_bag(&conn, &username).await?))
+}
+
+async fn update_default_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Json(bag): Json<Map<String, JsonValue>>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    let mut tx = conn.begin().await?;
+
+    if !bags::has_default_bag(&mut tx, &username).await? {
+        let new_bag_uuid = bags::add_user_bag(&mut tx, &username, bag).await?;
+        bags::set_default_bag(&mut tx, &username, new_bag_uuid).await?;
+    } else {
+        bags::update_default_bag(&mut tx, &username, bag).await?;
+    }
+    Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
+}
+
+async fn delete_default_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+) -> response::Result<(), DiscoError> {
+    bags::delete_default_bag(&conn, &username).await?;
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
@@ -112,7 +149,9 @@ async fn main() {
         )
         .route(
             "/:username/default",
-            get(|| async {}).post(|| async {}).delete(|| async {}),
+            get(get_default_bag)
+                .post(update_default_bag)
+                .delete(delete_default_bag),
         )
         .route(
             "/:username/:bag_id",
