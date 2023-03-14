@@ -18,6 +18,8 @@ use sqlx::{
     postgres::PgPool,
     types::{JsonValue, Uuid},
 };
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -37,6 +39,9 @@ struct OtelReport {
     trace_id: String,
 }
 
+/// Returns an open telementry trace ID back to the caller.
+///
+/// Just useful to make sure that the open telemetry middleware is working.
 async fn report_otel() -> response::Result<Json<OtelReport>, DiscoError> {
     let trace_id = axum_tracing_opentelemetry::find_current_trace_id()
         .context("failed to get trace id")
@@ -45,6 +50,16 @@ async fn report_otel() -> response::Result<Json<OtelReport>, DiscoError> {
     Ok(Json(OtelReport { trace_id: trace_id }))
 }
 
+/// Get all a user's bags.
+#[utoipa::path(
+    get,
+    path = "/bags/:username",
+    responses(
+        (status = 200, description = "Lists all of a user's bags", body = Bags),
+        (status = 404, description = "User didn't exist", body = DiscoError),
+        (status = 500, description = "Internal error", body = DiscoError)
+    )
+)]
 async fn get_user_bags(
     State(conn): State<PgPool>,   // Extracts the pool from the state.
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
@@ -52,6 +67,7 @@ async fn get_user_bags(
     Ok(Json(list_user_bags(&conn, &username).await?))
 }
 
+/// A a bag for a user.
 async fn add_user_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -62,6 +78,9 @@ async fn add_user_bag(
     Ok(Json(b))
 }
 
+/// Deletes all of a user's bags.
+///
+/// You probably don't want to actually call this.
 async fn delete_user_bags(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -70,6 +89,7 @@ async fn delete_user_bags(
     Ok(())
 }
 
+/// Returns whether the user has bags.
 async fn user_has_bags(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -82,6 +102,9 @@ async fn user_has_bags(
     Ok(status_code)
 }
 
+/// Returns a user's default bag.
+///
+/// Creates the default bag first if it doesn't exist.
 async fn get_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -95,6 +118,7 @@ async fn get_default_bag(
     Ok(Json(bags::get_default_bag(&conn, &username).await?))
 }
 
+/// Get a particular bag owned by a user.
 async fn get_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -103,6 +127,9 @@ async fn get_bag(
     Ok(Json(bags::get_bag(&conn, &username, &bag_id).await?))
 }
 
+/// Updates the default bag owned by a user.
+///
+/// This will create the default bag if it doesn't exist,.
 async fn update_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -118,6 +145,7 @@ async fn update_default_bag(
     Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
 }
 
+/// Deletes a user's defaul bag.
 async fn delete_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -126,6 +154,7 @@ async fn delete_default_bag(
     Ok(())
 }
 
+/// Deletes a particular bag for a user.
 async fn delete_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -135,6 +164,7 @@ async fn delete_bag(
     Ok(())
 }
 
+/// Updates a particular bag for a user.
 async fn update_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -157,6 +187,24 @@ async fn main() {
         }
     };
 
+    #[derive(OpenApi)]
+    #[openapi(
+        paths(
+            get_user_bags,
+        ),
+        components(
+            schemas(
+                bags::Bag, 
+                bags::Bags, 
+                service_errors::DiscoError,
+            )
+        ),
+        tags(
+            (name = "user-info", description="User information API")
+        )
+    )]
+
+    struct ApiDoc;
     match axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers() {
         Ok(_) => {}
         Err(e) => {
@@ -186,6 +234,7 @@ async fn main() {
         );
 
     let app = Router::new()
+        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .nest("/bags", bag_routes)
         .route("/otel", get(report_otel))
         .layer(response_with_trace_layer())

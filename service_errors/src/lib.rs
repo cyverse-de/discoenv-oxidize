@@ -4,36 +4,55 @@ use axum::{
 };
 use debuff::header;
 use debuff::svcerror::{ErrorCode, ServiceError};
+use utoipa::ToSchema;
 
 use thiserror;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, ToSchema)]
 pub enum DiscoError {
+    /// Something was unset.
     #[error("unset: {0}")]
+    #[schema(example = "unset: foo")]
     Unset(String),
 
+    /// Something was unspecified.
     #[error("unspecified error:: {0}")]
+    #[schema()]
     Unspecified(String),
 
+    /// Internal server error.
     #[error("internal server error: {0}")]
+    #[schema()]
     Internal(String),
 
+    /// Not found.
     #[error("not found: {0}")]
+    #[schema()]
     NotFound(String),
 
+    /// Bad request.
     #[error("bad request: {0}")]
+    #[schema()]
     BadRequest(String),
 
+    /// An attempt to marshal a value failed.
     #[error("marshal failure: {0}")]
+    #[schema()]
     MarshalFailure(String),
 
+    /// An attempt to unmarshal a value failed.
     #[error("unmarshal failure: {0}")]
+    #[schema()]
     UnmarshalFailure(String),
 
+    /// A parameter was missing.
     #[error("parameter missing: {0}")]
+    #[schema()]
     ParameterMissing(String),
 
+    /// A parameter was invalid.
     #[error("parameter invalid: {0}")]
+    #[schema()]
     ParameterInvalid(String),
 }
 

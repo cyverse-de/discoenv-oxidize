@@ -4,15 +4,24 @@ use sqlx::{
     query, query_as,
     types::{Json, JsonValue, Uuid},
 };
+use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize)]
+/// A JSON document stored in the database as a Bag.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Bag {
+    /// The unique identifier.
     pub id: Uuid,
+
+    /// The UUID of the user that owns the bag.
     pub user_id: Uuid,
+
+    // The JSON contents of the bag.
+    #[schema(value_type = Object)]
     pub contents: Json<Map<String, JsonValue>>,
 }
 
-#[derive(Serialize, Deserialize)]
+/// A vector of Bags.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 pub struct Bags {
     pub bags: Vec<Bag>,
 }

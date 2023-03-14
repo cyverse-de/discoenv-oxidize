@@ -11,6 +11,7 @@ sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "postgres", "mac
 debuff = { git = "https://github.com/cyverse-de/p", rev="b5e22577adef1a91b80ce3f468124fcdbeecc37d" }
 serde_json = "1.0.94"
 serde = { version = "1.0.154", features = ["derive", "serde_derive"] }
+utoipa = { version = "3.1.0", features = ["yaml", "axum_extras", "debug", "chrono", "time", "decimal", "uuid", "openapi_extensions"] }
 
 [dependencies.uuid]
 version = "1.1.2"
