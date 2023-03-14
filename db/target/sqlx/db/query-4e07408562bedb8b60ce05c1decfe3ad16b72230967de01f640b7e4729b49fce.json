@@ -1,13 +1,21 @@
 {
-  "query": "delete from bags where user_id = $1",
+  "query": "select id from users where username = $1",
   "describe": {
-    "columns": [],
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text"
       ]
     },
-    "nullable": []
+    "nullable": [
+      false
+    ]
   },
-  "hash": "277cf3ce1765cad8bdeba75354e4b99ca5be768b78fdcd3991d88a8ec4afa93c"
+  "hash": "0f6145094007fdced148d362f35ed52145f8fe27520c399f2d05b4b4604d0dae"
 }

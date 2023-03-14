@@ -66,7 +66,7 @@ async fn delete_user_bags(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    bags::delete_user_bag(&conn, &username).await?;
+    bags::delete_user_bags(&conn, &username).await?;
     Ok(())
 }
 
@@ -89,10 +89,18 @@ async fn get_default_bag(
     if !bags::has_default_bag(&conn, &username).await? {
         let new_bag: Map<String, JsonValue> = Map::new();
         let new_bag_uuid = bags::add_user_bag(&conn, &username, new_bag).await?;
-        bags::set_default_bag(&conn, &username, new_bag_uuid).await?;
+        bags::set_default_bag(&conn, &username, &new_bag_uuid).await?;
     }
 
     Ok(Json(bags::get_default_bag(&conn, &username).await?))
+}
+
+async fn get_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    Ok(Json(bags::get_bag(&conn, &username, &bag_id).await?))
 }
 
 async fn update_default_bag(
@@ -101,10 +109,9 @@ async fn update_default_bag(
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let mut tx = conn.begin().await?;
-
     if !bags::has_default_bag(&mut tx, &username).await? {
         let new_bag_uuid = bags::add_user_bag(&mut tx, &username, bag).await?;
-        bags::set_default_bag(&mut tx, &username, new_bag_uuid).await?;
+        bags::set_default_bag(&mut tx, &username, &new_bag_uuid).await?;
     } else {
         bags::update_default_bag(&mut tx, &username, bag).await?;
     }
@@ -117,6 +124,26 @@ async fn delete_default_bag(
 ) -> response::Result<(), DiscoError> {
     bags::delete_default_bag(&conn, &username).await?;
     Ok(())
+}
+
+async fn delete_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+) -> response::Result<(), DiscoError> {
+    bags::delete_bag(&conn, &username, &bag_id).await?;
+    Ok(())
+}
+
+async fn update_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+    Json(bag): Json<Map<String, JsonValue>>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    let mut tx = conn.begin().await?;
+    bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
+    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
 }
 
 #[tokio::main]
@@ -155,7 +182,7 @@ async fn main() {
         )
         .route(
             "/:username/:bag_id",
-            get(|| async {}).post(|| async {}).delete(|| async {}),
+            get(get_bag).post(update_bag).delete(delete_bag),
         );
 
     let app = Router::new()
