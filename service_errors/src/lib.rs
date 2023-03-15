@@ -4,11 +4,12 @@ use axum::{
 };
 use debuff::header;
 use debuff::svcerror::{ErrorCode, ServiceError};
+use serde_json::json;
 use utoipa::ToSchema;
 
 use thiserror;
 
-#[derive(thiserror::Error, Debug, ToSchema)]
+#[derive(thiserror::Error, Debug, ToSchema, serde::Serialize, serde::Deserialize)]
 pub enum DiscoError {
     /// Something was unset.
     #[error("unset: {0}")]
@@ -85,6 +86,15 @@ impl DiscoError {
         }
     }
 
+    fn to_json_string(&self) -> String {
+        let s_err: ServiceError = self.create_service_error();
+        json!(s_err).to_string()
+    }
+
+    pub fn create_service_error(&self) -> ServiceError {
+        self.clone().into()
+    }
+
     fn msg(&self) -> String {
         match self {
             DiscoError::Unset(m) => m.to_owned(),
@@ -156,7 +166,7 @@ impl From<DiscoError> for ErrorCode {
 
 impl IntoResponse for DiscoError {
     fn into_response(self) -> Response {
-        let msg = self.to_string().clone();
+        let msg: String = self.to_json_string();
         let status_code: StatusCode = self.into();
         (status_code, msg).into_response()
     }

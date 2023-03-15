@@ -18,7 +18,7 @@ use sqlx::{
     postgres::PgPool,
     types::{JsonValue, Uuid},
 };
-use utoipa::OpenApi;
+use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Parser)]
@@ -29,12 +29,12 @@ struct Cli {
     database_url: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ID {
     pub id: Uuid,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 struct OtelReport {
     trace_id: String,
 }
@@ -50,15 +50,22 @@ async fn report_otel() -> response::Result<Json<OtelReport>, DiscoError> {
     Ok(Json(OtelReport { trace_id: trace_id }))
 }
 
-/// Get all a user's bags.
+/// Get all of a user's bags.
+/// 
+/// Returns a complete listing of all of the user's bags. Mostly useful for administrative purposes.
 #[utoipa::path(
     get,
-    path = "/bags/:username",
+    path = "/bags/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
     responses(
         (status = 200, description = "Lists all of a user's bags", body = Bags),
-        (status = 404, description = "User didn't exist", body = DiscoError),
-        (status = 500, description = "Internal error", body = DiscoError)
-    )
+        (status = 400, description = "Bad request.", body = DiscoError),
+        (status = 404, description = "User didn't exist.", body = DiscoError),
+        (status = 500, description = "Internal error.", body = DiscoError)
+    ),
+    tag = "bag"
 )]
 async fn get_user_bags(
     State(conn): State<PgPool>,   // Extracts the pool from the state.
@@ -67,7 +74,48 @@ async fn get_user_bags(
     Ok(Json(list_user_bags(&conn, &username).await?))
 }
 
-/// A a bag for a user.
+/// Deletes all of a user's bags.
+///
+/// You probably don't want to actually call this.
+#[utoipa::path(
+    delete,
+    path = "/bags/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description="Deleted all of the user's bags."),
+        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
+async fn delete_user_bags(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+) -> response::Result<(), DiscoError> {
+    bags::delete_user_bags(&conn, &username).await?;
+    Ok(())
+}
+
+/// Add a bag for a user.
+/// 
+/// Adds a new bag for a user. It is not set to the default.
+#[utoipa::path(
+    put,
+    path = "/bags/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "Adds a bag for a user", body = ID),
+        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "bag"
+)]
 async fn add_user_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -78,18 +126,23 @@ async fn add_user_bag(
     Ok(Json(b))
 }
 
-/// Deletes all of a user's bags.
-///
-/// You probably don't want to actually call this.
-async fn delete_user_bags(
-    State(conn): State<PgPool>,
-    Path(username): Path<String>,
-) -> response::Result<(), DiscoError> {
-    bags::delete_user_bags(&conn, &username).await?;
-    Ok(())
-}
-
 /// Returns whether the user has bags.
+/// 
+/// Check the status code to tell whether the user has any bags defined.
+#[utoipa::path(
+    head,
+    path = "/bags/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "The user had one or more bags."),
+        (status = 404, description = "The user had no bags."),
+        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "bag"
+)]
 async fn user_has_bags(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -102,9 +155,98 @@ async fn user_has_bags(
     Ok(status_code)
 }
 
+/// Get a particular bag owned by a user.
+/// 
+/// Returns a bag owned by a user. Does not have to be the default bag.
+#[utoipa::path(
+    get,
+    path = "/bags/{username}/{bag_id}",
+    params(
+        ("username" = String, Path, description = "A username"),
+        ("bag_id" = String, Path, description = "A bag's UUID"),
+    ),
+    responses(
+        (status = 200, description = "The user's bag.", body = Bag),
+        (status = 404, description = "The user or bag was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
+async fn get_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    Ok(Json(bags::get_bag(&conn, &username, &bag_id).await?))
+}
+
+/// Updates a particular bag for a user.
+#[utoipa::path(
+    post,
+    path = "/bags/{username}/{bag_id}",
+    params(
+        ("username" = String, Path, description = "A username"),
+        ("bag_id" = String, Path, description = "A bag's UUID"),
+    ),
+    request_body = Bag,
+    responses(
+        (status = 200, description = "The user's default bag.", body = Bag),
+        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
+async fn update_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+    Json(bag): Json<Map<String, JsonValue>>,
+) -> response::Result<Json<Bag>, DiscoError> {
+    let mut tx = conn.begin().await?;
+    bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
+    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
+}
+
+/// Deletes a particular bag for a user.
+#[utoipa::path(
+    delete,
+    path = "/bags/{username}/{bag_id}",
+    params(
+        ("username" = String, Path, description = "A username"),
+        ("bag_id" = String, Path, description = "A bag's UUID"),
+    ),
+    responses(
+        (status = 200, description = "The user's bag was deleted."),
+        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
+async fn delete_bag(
+    State(conn): State<PgPool>,
+    Path(username): Path<String>,
+    Path(bag_id): Path<Uuid>,
+) -> response::Result<(), DiscoError> {
+    bags::delete_bag(&conn, &username, &bag_id).await?;
+    Ok(())
+}
+
 /// Returns a user's default bag.
 ///
 /// Creates the default bag first if it doesn't exist.
+#[utoipa::path(
+    get,
+    path = "/bags/{username}/default",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "The user's default bag.", body = Bag),
+        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error,", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
 async fn get_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -118,18 +260,23 @@ async fn get_default_bag(
     Ok(Json(bags::get_default_bag(&conn, &username).await?))
 }
 
-/// Get a particular bag owned by a user.
-async fn get_bag(
-    State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
-) -> response::Result<Json<Bag>, DiscoError> {
-    Ok(Json(bags::get_bag(&conn, &username, &bag_id).await?))
-}
-
 /// Updates the default bag owned by a user.
 ///
 /// This will create the default bag if it doesn't exist,.
+#[utoipa::path(
+    post,
+    path = "/bags/{username}/default",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    request_body = Bag,
+    responses(
+        (status = 200, description = "The user's default bag.", body = Bag),
+        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
 async fn update_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
@@ -145,35 +292,26 @@ async fn update_default_bag(
     Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
 }
 
-/// Deletes a user's defaul bag.
+/// Deletes a user's default bag.
+#[utoipa::path(
+    delete,
+    path = "/bags/{username}/default",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "The user's default bag was deleted."),
+        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+    ),
+    tag = "bag"
+)]
 async fn delete_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
     bags::delete_default_bag(&conn, &username).await?;
     Ok(())
-}
-
-/// Deletes a particular bag for a user.
-async fn delete_bag(
-    State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
-) -> response::Result<(), DiscoError> {
-    bags::delete_bag(&conn, &username, &bag_id).await?;
-    Ok(())
-}
-
-/// Updates a particular bag for a user.
-async fn update_bag(
-    State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
-    Json(bag): Json<Map<String, JsonValue>>,
-) -> response::Result<Json<Bag>, DiscoError> {
-    let mut tx = conn.begin().await?;
-    bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
-    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
 }
 
 #[tokio::main]
@@ -191,9 +329,19 @@ async fn main() {
     #[openapi(
         paths(
             get_user_bags,
+            delete_user_bags,
+            add_user_bag,
+            user_has_bags,
+            get_bag,
+            update_bag,
+            delete_bag,
+            get_default_bag,
+            update_default_bag,
+            delete_default_bag,
         ),
         components(
             schemas(
+                ID,
                 bags::Bag, 
                 bags::Bags, 
                 service_errors::DiscoError,
