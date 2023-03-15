@@ -149,6 +149,27 @@ where
     Ok(result.has_bags.unwrap_or(false))
 }
 
+pub async fn bag_exists<'a, E>(conn: E, username: &str, bag_id: &Uuid) -> Result<bool, sqlx::Error>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    let result = query!(
+        r#"
+            select count(*) > 0 as bag_exists
+            from bags
+            join users on bags.user_id = users.id
+            and users.username = $1
+            and bags.id = $2
+        "#,
+        username,
+        bag_id
+    )
+    .fetch_one(conn)
+    .await?;
+
+    Ok(result.bag_exists.unwrap_or(false))
+}
+
 pub async fn update_bag_contents<'a, E>(
     conn: E,
     id: &Uuid,

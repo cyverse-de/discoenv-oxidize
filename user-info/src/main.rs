@@ -8,7 +8,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::bags::{self, Bag};
+use db::{bags::{self, Bag}, users};
 use db::bags::{list_user_bags, Bags};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
@@ -71,7 +71,13 @@ async fn get_user_bags(
     State(conn): State<PgPool>,   // Extracts the pool from the state.
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
 ) -> response::Result<Json<Bags>, DiscoError> {
-    Ok(Json(list_user_bags(&conn, &username).await?))
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    Ok(Json(list_user_bags(&mut tx, &username).await?))
 }
 
 /// Deletes all of a user's bags.
@@ -95,7 +101,14 @@ async fn delete_user_bags(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    bags::delete_user_bags(&conn, &username).await?;
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    bags::delete_user_bags(&mut tx, &username).await?;
+
     Ok(())
 }
 
@@ -110,9 +123,15 @@ async fn delete_user_bags(
     ),
     responses(
         (status = 200, description = "Adds a bag for a user", body = ID),
-        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
-        (status = 404, description = "User didn't exist.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
     ),
     tag = "bag"
 )]
@@ -121,8 +140,16 @@ async fn add_user_bag(
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<ID>, DiscoError> {
-    let u = bags::add_user_bag(&conn, &username, bag).await?;
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    let u = bags::add_user_bag(&mut tx, &username, bag).await?;
+
     let b = ID { id: u };
+    
     Ok(Json(b))
 }
 
@@ -138,8 +165,12 @@ async fn add_user_bag(
     responses(
         (status = 200, description = "The user had one or more bags."),
         (status = 404, description = "The user had no bags."),
-        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
     ),
     tag = "bag"
 )]
@@ -167,8 +198,12 @@ async fn user_has_bags(
     ),
     responses(
         (status = 200, description = "The user's bag.", body = Bag),
-        (status = 404, description = "The user or bag was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user or bag was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -177,7 +212,17 @@ async fn get_bag(
     Path(username): Path<String>,
     Path(bag_id): Path<Uuid>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    Ok(Json(bags::get_bag(&conn, &username, &bag_id).await?))
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    if !bags::bag_exists(&mut tx, &username, &bag_id).await? {
+        return Err(DiscoError::NotFound(format!("bag {} was not found", bag_id)));
+    }
+
+    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
 }
 
 /// Updates a particular bag for a user.
@@ -203,7 +248,17 @@ async fn update_bag(
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    if !bags::bag_exists(&mut tx, &username, &bag_id).await? {
+        return Err(DiscoError::NotFound(format!("bag {} was not found", bag_id)));
+    }
+
     bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
+    
     Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
 }
 
@@ -227,7 +282,13 @@ async fn delete_bag(
     Path(username): Path<String>,
     Path(bag_id): Path<Uuid>,
 ) -> response::Result<(), DiscoError> {
-    bags::delete_bag(&conn, &username, &bag_id).await?;
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    bags::delete_bag(&mut tx, &username, &bag_id).await?;
     Ok(())
 }
 
@@ -251,13 +312,19 @@ async fn get_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    if !bags::has_default_bag(&conn, &username).await? {
-        let new_bag: Map<String, JsonValue> = Map::new();
-        let new_bag_uuid = bags::add_user_bag(&conn, &username, new_bag).await?;
-        bags::set_default_bag(&conn, &username, &new_bag_uuid).await?;
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
     }
 
-    Ok(Json(bags::get_default_bag(&conn, &username).await?))
+    if !bags::has_default_bag(&mut tx, &username).await? {
+        let new_bag: Map<String, JsonValue> = Map::new();
+        let new_bag_uuid = bags::add_user_bag(&conn, &username, new_bag).await?;
+        bags::set_default_bag(&mut tx, &username, &new_bag_uuid).await?;
+    }
+
+    Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
 }
 
 /// Updates the default bag owned by a user.
@@ -283,12 +350,18 @@ async fn update_default_bag(
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
     if !bags::has_default_bag(&mut tx, &username).await? {
         let new_bag_uuid = bags::add_user_bag(&mut tx, &username, bag).await?;
         bags::set_default_bag(&mut tx, &username, &new_bag_uuid).await?;
     } else {
         bags::update_default_bag(&mut tx, &username, bag).await?;
     }
+
     Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
 }
 
@@ -310,7 +383,13 @@ async fn delete_default_bag(
     State(conn): State<PgPool>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    bags::delete_default_bag(&conn, &username).await?;
+    let mut tx = conn.begin().await?;
+
+    if !users::username_exists(&mut tx, &username).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    }
+
+    bags::delete_default_bag(&mut tx, &username).await?;
     Ok(())
 }
 
