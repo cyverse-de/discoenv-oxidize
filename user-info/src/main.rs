@@ -61,9 +61,15 @@ async fn report_otel() -> response::Result<Json<OtelReport>, DiscoError> {
     ),
     responses(
         (status = 200, description = "Lists all of a user's bags", body = Bags),
-        (status = 400, description = "Bad request.", body = DiscoError),
-        (status = 404, description = "User didn't exist.", body = DiscoError),
-        (status = 500, description = "Internal error.", body = DiscoError)
+        (status = 400, description = "Bad request.", 
+            body = DiscoError,
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error())),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError,
+            example = json!(DiscoError::NotFound("user wasn't found".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError,
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -91,9 +97,15 @@ async fn get_user_bags(
     ),
     responses(
         (status = 200, description="Deleted all of the user's bags."),
-        (status = 400, description = "Bad request.", body = DiscoError, example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
-        (status = 404, description = "User didn't exist.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error())),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -236,8 +248,12 @@ async fn get_bag(
     request_body = Bag,
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
-        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -272,8 +288,12 @@ async fn update_bag(
     ),
     responses(
         (status = 200, description = "The user's bag was deleted."),
-        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -303,8 +323,12 @@ async fn delete_bag(
     ),
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
-        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error,", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error,", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -339,8 +363,12 @@ async fn get_default_bag(
     request_body = Bag,
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
-        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
@@ -374,8 +402,12 @@ async fn update_default_bag(
     ),
     responses(
         (status = 200, description = "The user's default bag was deleted."),
-        (status = 404, description = "The user was not found.", body = DiscoError, example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
-        (status = 500, description = "Internal error.", body = DiscoError, example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
+        (status = 404, description = "The user was not found.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error())),
     ),
     tag = "bag"
 )]
