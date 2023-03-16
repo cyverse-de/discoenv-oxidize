@@ -121,6 +121,8 @@ async fn delete_user_bags(
 
     bags::delete_user_bags(&mut tx, &username).await?;
 
+    tx.commit().await?;
+
     Ok(())
 }
 
@@ -133,6 +135,7 @@ async fn delete_user_bags(
     params(
         ("username" = String, Path, description = "A username"),
     ),
+    request_body = JsonValue::Object,
     responses(
         (status = 200, description = "Adds a bag for a user", body = ID),
         (status = 400, description = "Bad request.", 
@@ -159,6 +162,8 @@ async fn add_user_bag(
     }
 
     let u = bags::add_user_bag(&mut tx, &username, bag).await?;
+
+    tx.commit().await?;
 
     let b = ID { id: u };
     
@@ -221,8 +226,7 @@ async fn user_has_bags(
 )]
 async fn get_bag(
     State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
+    Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let mut tx = conn.begin().await?;
 
@@ -245,7 +249,7 @@ async fn get_bag(
         ("username" = String, Path, description = "A username"),
         ("bag_id" = String, Path, description = "A bag's UUID"),
     ),
-    request_body = Bag,
+    request_body = JsonValue::Object,
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
         (status = 404, description = "The user was not found.", 
@@ -259,8 +263,7 @@ async fn get_bag(
 )]
 async fn update_bag(
     State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
+    Path((username, bag_id)): Path<(String, Uuid)>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let mut tx = conn.begin().await?;
@@ -274,8 +277,12 @@ async fn update_bag(
     }
 
     bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
+
+    let retval = bags::get_bag(&mut tx, &username, &bag_id).await?;
     
-    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
+    tx.commit().await?;
+    
+    Ok(Json(retval))
 }
 
 /// Deletes a particular bag for a user.
@@ -299,8 +306,7 @@ async fn update_bag(
 )]
 async fn delete_bag(
     State(conn): State<PgPool>,
-    Path(username): Path<String>,
-    Path(bag_id): Path<Uuid>,
+    Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<(), DiscoError> {
     let mut tx = conn.begin().await?;
 
@@ -309,6 +315,9 @@ async fn delete_bag(
     }
 
     bags::delete_bag(&mut tx, &username, &bag_id).await?;
+
+    tx.commit().await?;
+
     Ok(())
 }
 
@@ -351,6 +360,8 @@ async fn get_default_bag(
     Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
 }
 
+
+
 /// Updates the default bag owned by a user.
 ///
 /// This will create the default bag if it doesn't exist,.
@@ -360,7 +371,7 @@ async fn get_default_bag(
     params(
         ("username" = String, Path, description = "A username"),
     ),
-    request_body = Bag,
+    request_body = JsonValue::Object,
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
         (status = 404, description = "The user was not found.", 
@@ -390,7 +401,11 @@ async fn update_default_bag(
         bags::update_default_bag(&mut tx, &username, bag).await?;
     }
 
-    Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
+    let retval = bags::get_default_bag(&mut tx, &username).await?;
+
+    tx.commit().await?;
+
+    Ok(Json(retval))
 }
 
 /// Deletes a user's default bag.
@@ -422,6 +437,9 @@ async fn delete_default_bag(
     }
 
     bags::delete_default_bag(&mut tx, &username).await?;
+
+    tx.commit().await?;
+
     Ok(())
 }
 
