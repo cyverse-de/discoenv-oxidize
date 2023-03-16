@@ -16,9 +16,24 @@ use db::{bags::{self, Bag}, users};
 use db::bags::{list_user_bags, Bags};
 use service_errors::DiscoError;
 
+use super::config;
+
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ID {
     pub id: Uuid,
+}
+
+fn fix_username(username: &str, cfg: &config::HandlerConfiguration) -> String {
+    let mut retval: String = username.into();
+
+    if cfg.append_user_domain && !cfg.user_domain.is_empty() && !retval.ends_with(&cfg.user_domain) {
+        if !cfg.user_domain.starts_with("@") {
+            retval = format!("{}@", retval);
+        }
+        retval = format!("{}{}", retval, cfg.user_domain);
+    }
+
+    retval
 }
 
 /// Get all of a user's bags.
@@ -45,16 +60,17 @@ pub struct ID {
     tag = "bag"
 )]
 pub async fn get_user_bags(
-    State(conn): State<PgPool>,   // Extracts the pool from the state.
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
 ) -> response::Result<Json<Bags>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    Ok(Json(list_user_bags(&mut tx, &username).await?))
+    Ok(Json(list_user_bags(&mut tx, &user).await?))
 }
 
 /// Deletes all of a user's bags.
@@ -81,16 +97,17 @@ pub async fn get_user_bags(
     tag = "bag"
 )]
 pub async fn delete_user_bags(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    bags::delete_user_bags(&mut tx, &username).await?;
+    bags::delete_user_bags(&mut tx, &user).await?;
 
     tx.commit().await?;
 
@@ -122,17 +139,18 @@ pub async fn delete_user_bags(
     tag = "bag"
 )]
 pub  async fn add_user_bag(
-    State(conn): State<PgPool>,
+   State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<ID>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    let u = bags::add_user_bag(&mut tx, &username, bag).await?;
+    let u = bags::add_user_bag(&mut tx, &user, bag).await?;
 
     tx.commit().await?;
 
@@ -163,11 +181,12 @@ pub  async fn add_user_bag(
     tag = "bag"
 )]
 pub async fn user_has_bags(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut status_code = StatusCode::OK;
-    let has_bag = bags::user_has_bags(&conn, &username).await?;
+    let has_bag = bags::user_has_bags(&conn, &user).await?;
     if !has_bag {
         status_code = StatusCode::NOT_FOUND
     }
@@ -196,20 +215,21 @@ pub async fn user_has_bags(
     tag = "bag"
 )]
 pub async fn get_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<Json<Bag>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    if !bags::bag_exists(&mut tx, &username, &bag_id).await? {
+    if !bags::bag_exists(&mut tx, &user, &bag_id).await? {
         return Err(DiscoError::NotFound(format!("bag {} was not found", bag_id)));
     }
 
-    Ok(Json(bags::get_bag(&mut tx, &username, &bag_id).await?))
+    Ok(Json(bags::get_bag(&mut tx, &user, &bag_id).await?))
 }
 
 /// Updates a particular bag for a user.
@@ -233,23 +253,24 @@ pub async fn get_bag(
     tag = "bag"
 )]
 pub async fn update_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path((username, bag_id)): Path<(String, Uuid)>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    if !bags::bag_exists(&mut tx, &username, &bag_id).await? {
+    if !bags::bag_exists(&mut tx, &user, &bag_id).await? {
         return Err(DiscoError::NotFound(format!("bag {} was not found", bag_id)));
     }
 
-    bags::update_bag(&mut tx, &username, &bag_id, bag).await?;
+    bags::update_bag(&mut tx, &user, &bag_id, bag).await?;
 
-    let retval = bags::get_bag(&mut tx, &username, &bag_id).await?;
+    let retval = bags::get_bag(&mut tx, &user, &bag_id).await?;
     
     tx.commit().await?;
     
@@ -276,16 +297,17 @@ pub async fn update_bag(
     tag = "bag"
 )]
 pub async fn delete_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<(), DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    bags::delete_bag(&mut tx, &username, &bag_id).await?;
+    bags::delete_bag(&mut tx, &user, &bag_id).await?;
 
     tx.commit().await?;
 
@@ -313,22 +335,23 @@ pub async fn delete_bag(
     tag = "bag"
 )]
 pub async fn get_default_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<Json<Bag>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    if !bags::has_default_bag(&mut tx, &username).await? {
+    if !bags::has_default_bag(&mut tx, &user).await? {
         let new_bag: Map<String, JsonValue> = Map::new();
-        let new_bag_uuid = bags::add_user_bag(&conn, &username, new_bag).await?;
-        bags::set_default_bag(&mut tx, &username, &new_bag_uuid).await?;
+        let new_bag_uuid = bags::add_user_bag(&conn, &user, new_bag).await?;
+        bags::set_default_bag(&mut tx, &user, &new_bag_uuid).await?;
     }
 
-    Ok(Json(bags::get_default_bag(&mut tx, &username).await?))
+    Ok(Json(bags::get_default_bag(&mut tx, &user).await?))
 }
 
 
@@ -355,24 +378,25 @@ pub async fn get_default_bag(
     tag = "bag"
 )]
 pub async fn update_default_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    if !bags::has_default_bag(&mut tx, &username).await? {
-        let new_bag_uuid = bags::add_user_bag(&mut tx, &username, bag).await?;
-        bags::set_default_bag(&mut tx, &username, &new_bag_uuid).await?;
+    if !bags::has_default_bag(&mut tx, &user).await? {
+        let new_bag_uuid = bags::add_user_bag(&mut tx, &user, bag).await?;
+        bags::set_default_bag(&mut tx, &user, &new_bag_uuid).await?;
     } else {
-        bags::update_default_bag(&mut tx, &username, bag).await?;
+        bags::update_default_bag(&mut tx, &user, bag).await?;
     }
 
-    let retval = bags::get_default_bag(&mut tx, &username).await?;
+    let retval = bags::get_default_bag(&mut tx, &user).await?;
 
     tx.commit().await?;
 
@@ -398,16 +422,17 @@ pub async fn update_default_bag(
     tag = "bag"
 )]
 pub async fn delete_default_bag(
-    State(conn): State<PgPool>,
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
+    let user = fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
-    if !users::username_exists(&mut tx, &username).await? {
-        return Err(DiscoError::NotFound(format!("user {} was not found", username)));
+    if !users::username_exists(&mut tx, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
 
-    bags::delete_default_bag(&mut tx, &username).await?;
+    bags::delete_default_bag(&mut tx, &user).await?;
 
     tx.commit().await?;
 

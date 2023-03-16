@@ -20,6 +20,15 @@ struct Cli {
     #[arg(short, long)]
     /// The connection string for the database in the format postgres:://user:password@host:port/database
     database_url: String,
+
+    /// Whether to include the user domain if it's missing from requests.
+    #[arg(short, long, default_value_t = true)]
+    append_user_domain: bool,
+
+    // The user domain. Appended to usernames.
+    #[arg(short, long)]
+    user_domain: String,
+
 }
 
 #[tokio::main]
@@ -31,6 +40,11 @@ async fn main() {
             println!("error connecting to the database: {}", e);
             return;
         }
+    };
+
+    let cfg = handlers::config::HandlerConfiguration{
+        append_user_domain: cli.append_user_domain,
+        user_domain: cli.user_domain.clone(),
     };
 
     #[derive(OpenApi)]
@@ -97,7 +111,7 @@ async fn main() {
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
-        .with_state(pool);
+        .with_state((pool, cfg));
 
     let addr = match "0.0.0.0:60000".parse() {
         Ok(v) => v,
