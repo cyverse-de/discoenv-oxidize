@@ -7,7 +7,7 @@ use sqlx::{
 use utoipa::ToSchema;
 
 /// A JSON document stored in the database as a Bag.
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub struct Bag {
     /// The unique identifier.
     pub id: Uuid,
@@ -21,7 +21,7 @@ pub struct Bag {
 }
 
 /// A vector of Bags.
-#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema, Clone, PartialEq)]
 pub struct Bags {
     pub bags: Vec<Bag>,
 }
