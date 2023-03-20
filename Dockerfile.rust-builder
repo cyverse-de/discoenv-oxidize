@@ -1,0 +1,9 @@
+FROM rust:1.68
+COPY . .
+
+## One of the dependencies needs protoc installed to compile.
+RUN apt-get update -y && apt-get install -y protobuf-compiler
+
+## Build the service_errors package in the hope that it will compile the rest
+## of the dependencies.
+RUN cargo build --workspace --release -p service_errors
