@@ -5,10 +5,4 @@ members = [
 	"service_errors",
 	"service_signals",
 	"db",
-	"fake",
-]
-
-[workspace.exclude]
-members = [
-	"fake",
 ]

@@ -2,11 +2,11 @@ FROM rust:1.68
 COPY ./Cargo.lock .
 COPY ./Cargo.toml .
 COPY ./sqlx-data.json .
-COPY ./fake .
+COPY ./service_errors .
 
 ## One of the dependencies needs protoc installed to compile.
 RUN apt-get update -y && apt-get install -y protobuf-compiler
 
 ## Build the service_errors package in the hope that it will compile the rest
 ## of the dependencies.
-RUN cargo build --workspace --release -p fake
+RUN cargo build --workspace -p service_errors
