@@ -1,0 +1,9 @@
+apiVersion: skaffold/v4beta3
+kind: Config
+build:
+  artifacts:
+    - image: harbor.cyverse.org/discoenv-oxidize
+      context: .
+manifests:
+    rawYaml:
+      - kubernetes/user-info.yaml
