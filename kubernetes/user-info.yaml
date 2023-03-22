@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user-info
+  name: user-info2
 spec:
   replicas: 2
   selector:
     matchLabels:
-      de-app: user-info
+      de-app: user-info2
   template:
     metadata:
       labels:
-        de-app: user-info
+        de-app: user-info2
         app: de
     spec:
-      serviceAccountName: user-info
+      serviceAccountName: user-info2
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -22,7 +22,7 @@ spec:
               - key: de-app
                 operator: In
                 values:
-                - user-info
+                - user-info2
             topologyKey: kubernetes.io/hostname
       restartPolicy: Always
       volumes:
@@ -36,15 +36,9 @@ spec:
               - key: timezone
                 path: timezone
       containers:
-      - name: user-info
-        image: harbor.cyverse.org/de/user-info
-        resources:
-          requests:
-            cpu: "1m"
-            memory: "128Mi"
-          limits:
-            cpu: "100m"
-            memory: "256Mi"
+      - name: user-info2
+        image: harbor.cyverse.org/de/discoenv-oxidize
+        command: ["/user-info"]
         args:
           - --user-domain
           - "@$(USER_SUFFIX)"
@@ -52,7 +46,7 @@ spec:
           - "${DE_DATABASE_URI}"
         env:
           - name: SERVICE_NAME
-            value: user-info
+            value: user-info2
           - name: USER_SUFFIX
             valueFrom:
               secretKeyRef:
@@ -71,6 +65,13 @@ spec:
         ports:
           - name: listen-port
             containerPort: 60000
+        resources:
+          requests:
+            cpu: "1m"
+            memory: "128Mi"
+          limits:
+            cpu: "100m"
+            memory: "256Mi"
         volumeMounts:
           - name: localtime
             mountPath: /etc/localtime
@@ -94,10 +95,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: user-info
+  name: user-info2
 spec:
   selector:
-    de-app: user-info
+    de-app: user-info2
   ports:
     - protocol: TCP
       port: 80
