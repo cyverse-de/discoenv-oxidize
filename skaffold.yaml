@@ -10,4 +10,4 @@ build:
   local: {}
 manifests:
     rawYaml:
-      - kubernetes/user-info.yaml
+      - k8s/user-info.yaml
