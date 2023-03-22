@@ -34,6 +34,9 @@ struct Cli {
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
+
+    println!("database URL: {}", &cli.database_url);
+
     let pool = match PgPool::connect(&cli.database_url).await {
         Ok(pool) => pool,
         Err(e) => {
