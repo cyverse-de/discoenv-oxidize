@@ -1,10 +1,16 @@
-FROM rust:1.68 as build-env
-## One of the dependencies needs protoc installed to compile.
-RUN apt-get update -y && apt-get install -y protobuf-compiler
+# Prepare the list of dependencies to build.
+FROM harbor.cyverse.org/de/rust-builder as planner
 WORKDIR /usr/src/discoenv-oxidize
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Build and cache the dependencies
+FROM planner as builder
+COPY --from=planner /usr/src/discoenv-oxidize/recipe.json .
+RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 RUN cargo build --workspace --release
 
 FROM gcr.io/distroless/cc
-COPY --from=build-env  /usr/src/discoenv-oxidize/target/release/user-info /user-info
+COPY --from=builder  /usr/src/discoenv-oxidize/target/release/user-info /user-info
 
