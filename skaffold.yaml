@@ -4,6 +4,10 @@ build:
   artifacts:
     - image: harbor.cyverse.org/de/discoenv-oxidize
       context: .
+      docker:
+        cacheFrom:
+          - harbor.cyverse.org/de/discoenv-oxidize
+  local: {}
 manifests:
     rawYaml:
       - kubernetes/user-info.yaml
