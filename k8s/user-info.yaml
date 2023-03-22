@@ -42,7 +42,7 @@ spec:
           - --user-domain
           - "@$(USER_SUFFIX)"
           - --database-url
-          - "${DE_DATABASE_URI}"
+          - "\"${DE_DATABASE_URI}\""
         env:
           - name: SERVICE_NAME
             value: user-info2
