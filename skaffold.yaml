@@ -2,7 +2,7 @@ apiVersion: skaffold/v4beta3
 kind: Config
 build:
   artifacts:
-    - image: harbor.cyverse.org/discoenv-oxidize
+    - image: harbor.cyverse.org/de/discoenv-oxidize
       context: .
 manifests:
     rawYaml:

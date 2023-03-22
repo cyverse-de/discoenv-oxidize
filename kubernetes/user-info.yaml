@@ -13,7 +13,6 @@ spec:
         de-app: user-info2
         app: de
     spec:
-      serviceAccountName: user-info2
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
