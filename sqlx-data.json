@@ -25,6 +25,38 @@
     },
     "query": "\n            DELETE FROM bags\n            WHERE bags.id = (\n                SELECT \n                    b.id\n                FROM \n                    bags b\n                JOIN\n                    default_bags d ON b.id = d.bag_id\n                JOIN\n                    users u ON d.user_id = u.id\n                WHERE\n                    u.username = $1\n            )\n        "
   },
+  "0a9dd0572966556a68a36b1a035cb7540f1e265d66b21dc2065b40b0b909fc64": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "preferences: Json<Map<String, JsonValue>>",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT\n                p.id,\n                p.user_id,\n                p.preferences as \"preferences: Json<Map<String, JsonValue>>\"\n            FROM user_preferences p\n            JOIN users u ON p.user_id = u.id\n            WHERE u.username = $1\n        "
+  },
   "0f6145094007fdced148d362f35ed52145f8fe27520c399f2d05b4b4604d0dae": {
     "describe": {
       "columns": [
@@ -65,6 +97,19 @@
       }
     },
     "query": "\n            insert into bags \n                (user_id, contents) \n            values \n                ((SELECT id from users where username = $1), $2) returning id"
+  },
+  "1cac88e50ac7901538837049c0dd427597fca21bc10f71e460a101750bf40cd2": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            UPDATE user_preferences \n            SET preferences = $2\n            FROM users\n            WHERE user_preferences.user_id = users.id\n            AND users.username = $1\n        "
   },
   "24aa29a0c55f9c415f852adc8a4bd4ccf80495f7f4eebfea34b33339f4bed68a": {
     "describe": {
@@ -180,6 +225,19 @@
       }
     },
     "query": "select count(*) > 0 as has_user from users where username = $1"
+  },
+  "637f077030c3f206b7681552deaecadb2478a177cb1add4741d207ab783d9ddb": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n            DELETE FROM user_preferences \n            WHERE id = $2 \n            AND user_id = (\n                SELECT id \n                FROM users \n                WHERE username = $1\n            )\n        "
   },
   "6acdb76d612d61365fa4e5a2e09ddcbebc452a633d082096c88ae966947819a1": {
     "describe": {
@@ -339,6 +397,26 @@
     },
     "query": "\n            UPDATE bags\n            SET contents = $3\n            FROM users\n            WHERE bags.id = $2\n            AND bags.user_id = users.id\n            AND users.username = $1\n        "
   },
+  "bebcc1dfc4c089a554be1962fedc964be3cb1772129b84bca8e8e0d2d68295e9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "has_preferences",
+          "ordinal": 0,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT COUNT(*) > 0 AS has_preferences\n            FROM user_preferences\n            JOIN users ON user_preferences.user_id = users.id\n            AND users.username = $1\n        "
+  },
   "c5c3b196fa51f2ae6960ae2a4fba89230f47ec905a50a8ef58f926f6f81c0381": {
     "describe": {
       "columns": [],
@@ -371,5 +449,26 @@
       }
     },
     "query": "select count(*) > 0 as has_user from users where id = $1"
+  },
+  "f6d7bfb295b72e27e207b0aa4c9eeb53f3268e607d04f6248b1fcc343b7647e8": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO user_preferences\n                (user_id, preferences)\n            VALUES\n                ((SELECT id from users where username = $1), $2) \n            RETURNING id\n        "
   }
 }

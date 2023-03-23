@@ -1,21 +1,14 @@
 {
-  "query": "select id from users where username = $1",
+  "query": "\n            DELETE FROM user_preferences \n            WHERE id = $2 \n            AND user_id = (\n                SELECT id \n                FROM users \n                WHERE username = $1\n            )\n        ",
   "describe": {
-    "columns": [
-      {
-        "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
-      }
-    ],
+    "columns": [],
     "parameters": {
       "Left": [
-        "Text"
+        "Text",
+        "Uuid"
       ]
     },
-    "nullable": [
-      false
-    ]
+    "nullable": []
   },
-  "hash": "0f6145094007fdced148d362f35ed52145f8fe27520c399f2d05b4b4604d0dae"
+  "hash": "637f077030c3f206b7681552deaecadb2478a177cb1add4741d207ab783d9ddb"
 }
