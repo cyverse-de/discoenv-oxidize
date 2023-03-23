@@ -125,6 +125,7 @@ async fn main() {
         );
 
     let app = Router::new()
+        .route("/", get(|| async {}))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .nest("/bags", bag_routes)
         .route("/otel", get(handlers::otel::report_otel))
