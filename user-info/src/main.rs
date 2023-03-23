@@ -5,6 +5,8 @@ use axum::{
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use db::bags;
+use serde::{Deserialize, Serialize};
+use serde_yaml::{self};
 use service_signals::shutdown_signal;
 use sqlx::{
     postgres::PgPool,
@@ -17,27 +19,41 @@ use user_info::handlers;
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
 struct Cli {
-    #[arg(short, long)]
-    /// The connection string for the database in the format postgres:://user:password@host:port/database
-    database_url: String,
-
     /// Whether to include the user domain if it's missing from requests.
     #[arg(short, long, default_value_t = true)]
     append_user_domain: bool,
 
-    // The user domain. Appended to usernames.
-    #[arg(short, long)]
-    user_domain: String,
+    /// The config file to read settings from.
+    #[arg(short, long, default_value_t = String::from("/etc/cyverse/de/configs/service.yml"))]
+    config: String
+}
 
+#[derive(Debug, Serialize, Deserialize)]
+struct ConfigDB {
+    uri: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ConfigUsers {
+    domain: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    db: ConfigDB, 
+    users: ConfigUsers,
 }
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
 
-    println!("database URL: {}", &cli.database_url);
+    let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
+    let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
 
-    let pool = match PgPool::connect(&cli.database_url).await {
+    println!("database URL: {}", cfg.db.uri);
+
+    let pool = match PgPool::connect(&cfg.db.uri).await {
         Ok(pool) => pool,
         Err(e) => {
             println!("error connecting to the database: {}", e);
@@ -47,7 +63,7 @@ async fn main() {
 
     let cfg = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
-        user_domain: cli.user_domain.clone(),
+        user_domain: cfg.users.domain.clone(),
     };
 
     #[derive(OpenApi)]
