@@ -1,5 +1,5 @@
 {
-  "query": "\n            SELECT\n                p.id,\n                p.user_id,\n                p.preferences as \"preferences: Json<Map<String, JsonValue>>\"\n            FROM user_preferences p\n            JOIN users u ON p.user_id = u.id\n            WHERE u.username = $1\n        ",
+  "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.saved_searches\n            FROM\n                user_saved_searches s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -14,7 +14,7 @@
       },
       {
         "ordinal": 2,
-        "name": "preferences: Json<Map<String, JsonValue>>",
+        "name": "saved_searches",
         "type_info": "Text"
       }
     ],
@@ -29,5 +29,5 @@
       false
     ]
   },
-  "hash": "0a9dd0572966556a68a36b1a035cb7540f1e265d66b21dc2065b40b0b909fc64"
+  "hash": "e785b7d74ded09e66699287827dc15b322ddfa5255b68713ee308740a948ae4f"
 }

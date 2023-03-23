@@ -1,5 +1,5 @@
 {
-  "query": "\n            DELETE FROM user_preferences \n            WHERE id = $2 \n            AND user_id = (\n                SELECT id \n                FROM users \n                WHERE username = $1\n            )\n        ",
+  "query": "\n            DELETE FROM user_saved_searches\n            WHERE user_saved_searches.id = $2\n            AND user_saved_searches.user_id = (SELECT id FROM users WHERE username = $1)\n        ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "637f077030c3f206b7681552deaecadb2478a177cb1add4741d207ab783d9ddb"
+  "hash": "7e1ea6c33193a9230370d929360a237b5903c72aceff4a8ae894ba2049660ded"
 }
