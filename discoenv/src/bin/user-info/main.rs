@@ -1,3 +1,6 @@
+extern crate db;
+extern crate service_signals;
+
 use axum::{
     routing::get,
     Router,
@@ -14,7 +17,7 @@ use sqlx::{
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use user_info::handlers;
+use discoenv::handlers;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]

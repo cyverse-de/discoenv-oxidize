@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-	"user-info",
+	"discoenv",
 	"service_errors",
 	"service_signals",
 	"db",
