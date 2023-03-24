@@ -85,7 +85,7 @@ async fn main() {
         ),
         components(
             schemas(
-                handlers::bags::ID,
+                handlers::common::ID,
                 bags::Bag, 
                 bags::Bags, 
                 service_errors::DiscoError,

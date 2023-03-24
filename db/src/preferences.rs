@@ -45,10 +45,7 @@ where
     Ok(result.has_preferences.unwrap_or(false))
 }
 
-pub async fn user_preferences<'a, E>(
-    conn: E,
-    username: &str,
-) -> Result<PreferencesList, sqlx::Error>
+pub async fn user_preferences<'a, E>(conn: E, username: &str) -> Result<Preferences, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
@@ -65,10 +62,10 @@ where
         "#,
         username,
     )
-    .fetch_all(conn)
+    .fetch_one(conn)
     .await?;
 
-    Ok(PreferencesList { preferences })
+    Ok(preferences)
 }
 
 pub async fn add_user_preferences<'a, E>(
@@ -121,26 +118,20 @@ where
     Ok(result.rows_affected())
 }
 
-pub async fn delete_user_preferences<'a, E>(
-    conn: E,
-    username: &str,
-    prefs_id: &Uuid,
-) -> Result<u64, sqlx::Error>
+pub async fn delete_user_preferences<'a, E>(conn: E, username: &str) -> Result<u64, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
     Ok(query!(
         r#"
             DELETE FROM user_preferences 
-            WHERE id = $2 
-            AND user_id = (
+            WHERE user_id = (
                 SELECT id 
                 FROM users 
                 WHERE username = $1
             )
         "#,
         username,
-        prefs_id,
     )
     .execute(conn)
     .await?
