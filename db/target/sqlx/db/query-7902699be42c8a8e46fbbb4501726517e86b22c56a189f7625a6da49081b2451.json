@@ -1,11 +1,21 @@
 {
-  "query": "\n            SELECT \n                COUNT(*) > 0 as has_bags\n            FROM\n                bags b\n            JOIN\n                default_bags d ON b.id = d.bag_id\n            JOIN\n                users u ON d.user_id = u.id\n            WHERE\n                u.username = $1\n        ",
+  "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.saved_searches\n            FROM\n                user_saved_searches s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "has_bags",
-        "type_info": "Bool"
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "saved_searches",
+        "type_info": "Text"
       }
     ],
     "parameters": {
@@ -14,8 +24,10 @@
       ]
     },
     "nullable": [
-      null
+      false,
+      false,
+      false
     ]
   },
-  "hash": "24aa29a0c55f9c415f852adc8a4bd4ccf80495f7f4eebfea34b33339f4bed68a"
+  "hash": "e785b7d74ded09e66699287827dc15b322ddfa5255b68713ee308740a948ae4f"
 }

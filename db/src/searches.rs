@@ -40,10 +40,10 @@ where
     Ok(result.has_saved_searches.unwrap_or(false))
 }
 
-pub async fn list_saved_searches<'a, E>(
+pub async fn get_saved_searches<'a, E>(
     conn: E,
     username: &str,
-) -> Result<SavedSearchesList, sqlx::Error>
+) -> Result<SavedSearches, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
@@ -61,10 +61,10 @@ where
         "#,
         username,
     )
-    .fetch_all(conn)
+    .fetch_one(conn)
     .await?;
 
-    Ok(SavedSearchesList { saved_searches })
+    Ok(saved_searches)
 }
 
 pub async fn add_saved_searches<'a, E>(
@@ -117,22 +117,16 @@ where
     Ok(result.rows_affected())
 }
 
-pub async fn delete_saved_searches<'a, E>(
-    conn: E,
-    username: &str,
-    saved_searches_id: &Uuid,
-) -> Result<u64, sqlx::Error>
+pub async fn delete_saved_searches<'a, E>(conn: E, username: &str) -> Result<u64, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
     let result = query!(
         r#"
             DELETE FROM user_saved_searches
-            WHERE user_saved_searches.id = $2
-            AND user_saved_searches.user_id = (SELECT id FROM users WHERE username = $1)
+            WHERE user_id = (SELECT id FROM users WHERE username = $1)
         "#,
         username,
-        saved_searches_id,
     )
     .execute(conn)
     .await?;
