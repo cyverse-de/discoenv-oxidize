@@ -1,5 +1,5 @@
 {
-  "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.saved_searches\n            FROM\n                user_saved_searches s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        ",
+  "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.session\n            FROM\n                user_sessions s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -14,7 +14,7 @@
       },
       {
         "ordinal": 2,
-        "name": "saved_searches",
+        "name": "session",
         "type_info": "Text"
       }
     ],
@@ -29,5 +29,5 @@
       false
     ]
   },
-  "hash": "e785b7d74ded09e66699287827dc15b322ddfa5255b68713ee308740a948ae4f"
+  "hash": "e63a59db1a0f17e00dedf5a523ba9e6d0521a7765784c37181718e684e4b4a6a"
 }
