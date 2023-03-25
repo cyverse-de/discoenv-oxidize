@@ -40,7 +40,7 @@ where
     Ok(result.has_session.unwrap_or(false))
 }
 
-pub async fn list_sessions<'a, E>(conn: E, username: &str) -> Result<Sessions, sqlx::Error>
+pub async fn get_session<'a, E>(conn: E, username: &str) -> Result<Session, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
@@ -58,10 +58,10 @@ where
         "#,
         username,
     )
-    .fetch_all(conn)
+    .fetch_one(conn)
     .await?;
 
-    Ok(Sessions { sessions })
+    Ok(sessions)
 }
 
 pub async fn add_session<'a, E>(conn: E, username: &str, session: &str) -> Result<Uuid, sqlx::Error>
@@ -110,22 +110,16 @@ where
     Ok(result.rows_affected())
 }
 
-pub async fn delete_session<'a, E>(
-    conn: E,
-    username: &str,
-    session_id: &Uuid,
-) -> Result<u64, sqlx::Error>
+pub async fn delete_session<'a, E>(conn: E, username: &str) -> Result<u64, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
     let result = query!(
         r#"
             DELETE FROM user_sessions
-            WHERE user_sessions.id = $2
-            AND user_sessions.user_id = (SELECT id FROM users WHERE username = $1)
+            WHERE user_sessions.user_id = (SELECT id FROM users WHERE username = $1)
         "#,
         username,
-        session_id,
     )
     .execute(conn)
     .await?;

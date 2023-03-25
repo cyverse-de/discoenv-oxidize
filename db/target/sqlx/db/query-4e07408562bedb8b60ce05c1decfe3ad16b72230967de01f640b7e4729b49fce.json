@@ -1,13 +1,21 @@
 {
-  "query": "\n            DELETE FROM user_saved_searches\n            WHERE user_id = (SELECT id FROM users WHERE username = $1)\n        ",
+  "query": "\n            SELECT COUNT(*) > 0 AS has_session\n            FROM user_sessions\n            JOIN users ON user_sessions.user_id = users.id\n            WHERE users.username = $1\n        ",
   "describe": {
-    "columns": [],
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "has_session",
+        "type_info": "Bool"
+      }
+    ],
     "parameters": {
       "Left": [
         "Text"
       ]
     },
-    "nullable": []
+    "nullable": [
+      null
+    ]
   },
-  "hash": "c11000fe0bcd6dd65d7d246f2ee9df4dd4077dd5e17953e6ab68baa6eda4a397"
+  "hash": "e4e532a503d1c33619d000e1d6203e0e7211c5a2659e5e8f156b5fe772124ba9"
 }
