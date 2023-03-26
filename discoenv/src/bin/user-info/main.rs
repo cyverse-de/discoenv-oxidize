@@ -7,7 +7,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::bags;
+use db::{bags, preferences};
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
 use service_signals::shutdown_signal;
@@ -82,12 +82,17 @@ async fn main() {
             handlers::bags::get_default_bag,
             handlers::bags::update_default_bag,
             handlers::bags::delete_default_bag,
+            handlers::preferences::get_user_preferences,
+            handlers::preferences::add_user_preferences,
+            handlers::preferences::update_user_preferences,
+            handlers::preferences::delete_user_preferences,
         ),
         components(
             schemas(
                 handlers::common::ID,
                 bags::Bag, 
                 bags::Bags, 
+                preferences::Preferences,
                 service_errors::DiscoError,
             )
         ),
