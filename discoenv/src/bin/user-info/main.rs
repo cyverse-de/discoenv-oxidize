@@ -123,6 +123,15 @@ async fn main() {
             .delete(handlers::searches::delete_saved_searches)
         );
 
+    let sessions_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::sessions::get_user_sessions)
+            .put(handlers::sessions::add_user_sessions)
+            .post(handlers::sessions::update_user_sessions)
+            .delete(handlers::sessions::delete_user_sessions)
+        );
+
     let bag_routes = Router::new()
         .route("/", get(|| async {}))
         .route(
@@ -150,6 +159,7 @@ async fn main() {
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
+        .nest("/sessions", sessions_routes)
         .nest("/preferenaces", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
