@@ -86,6 +86,10 @@ async fn main() {
             handlers::preferences::add_user_preferences,
             handlers::preferences::update_user_preferences,
             handlers::preferences::delete_user_preferences,
+            handlers::searches::get_saved_searches,
+            handlers::searches::add_saved_searches,
+            handlers::searches::update_saved_searches,
+            handlers::searches::delete_saved_searches,
         ),
         components(
             schemas(

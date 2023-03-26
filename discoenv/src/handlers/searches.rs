@@ -13,6 +13,29 @@ use service_errors::DiscoError;
 use super::common;
 use super::config;
 
+/// Get the saved searches for a user.
+///
+/// Returns the JSON document containing the saved searches for a user.
+#[utoipa::path(
+    get,
+    path = "/searches/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "Returned the user's saved searches", body = SavedSearches),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "searches"
+)]
 pub async fn get_saved_searches(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
     Path(username): Path<String>,
@@ -26,6 +49,29 @@ pub async fn get_saved_searches(
     Ok(Json(retval))
 }
 
+/// Whether the user has saved searches.
+///
+/// Returns a 200 status if the user has saved searches.
+#[utoipa::path(
+    head,
+    path = "/searches/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "The user has saved searches"),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "searches"
+)]
 pub async fn has_saved_searches(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
     Path(username): Path<String>,
@@ -39,6 +85,30 @@ pub async fn has_saved_searches(
     Ok(status_code)
 }
 
+/// Adds a saved searches document for a user.
+///
+/// Adds a new saved searches document for a user. Only really useful when setting up a new user.
+#[utoipa::path(
+    put,
+    path = "/searches/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    request_body = JsonValue::Object<Searches>,
+    responses(
+        (status = 200, description = "The saved searches document was added", body = common::ID),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "searches"
+)]
 pub async fn add_saved_searches(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
     Path(username): Path<String>,
@@ -56,6 +126,30 @@ pub async fn add_saved_searches(
     Ok(Json(common::ID { id }))
 }
 
+/// Updates the saved searches document stored for a user.
+///
+/// Returns the updated searches document.
+#[utoipa::path(
+    post,
+    path = "/searches/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    request_body = JsonValue::Object<Searches>,
+    responses(
+        (status = 200, description = "The saved searches document was updated", body = JsonValue::Object<Searches>),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "searches"
+)]
 pub async fn update_saved_searches(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
     Path(username): Path<String>,
@@ -74,6 +168,29 @@ pub async fn update_saved_searches(
     Ok(Json(retval))
 }
 
+/// Deletes the saved searches document for a user.
+///
+/// Returns a 200 status code on success.
+#[utoipa::path(
+    delete,
+    path = "/searches/{username}",
+    params(
+        ("username" = String, Path, description = "A username"),
+    ),
+    responses(
+        (status = 200, description = "The saved searches document was deleted"),
+        (status = 400, description = "Bad request.", 
+            body = DiscoError, 
+            example = json!(DiscoError::BadRequest("bad request".to_owned()).create_service_error()) ),
+        (status = 404, description = "User didn't exist.", 
+            body = DiscoError, 
+            example = json!(DiscoError::NotFound("user doesn't exist".to_owned()).create_service_error())),
+        (status = 500, description = "Internal error.", 
+            body = DiscoError, 
+            example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
+    ),
+    tag = "searches"
+)]
 pub async fn delete_saved_searches(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
     Path(username): Path<String>,
