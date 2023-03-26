@@ -70,7 +70,7 @@ pub async fn get_user_preferences(
             body = DiscoError, 
             example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
     ),
-    path = "preferences"
+    tag = "preferences"
 
 )]
 pub async fn add_user_preferences(
@@ -166,6 +166,7 @@ pub async fn update_user_preferences(
             body = DiscoError, 
             example = json!(DiscoError::Internal("internal error".to_owned()).create_service_error()))
     ),
+    tag = "preferences"
 
 )]
 pub async fn delete_user_preferences(

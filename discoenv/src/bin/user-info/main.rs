@@ -7,7 +7,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::{bags, preferences};
+use db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
 use service_signals::shutdown_signal;
@@ -97,6 +97,7 @@ async fn main() {
                 bags::Bag, 
                 bags::Bags, 
                 preferences::Preferences,
+                searches::SavedSearches,
                 service_errors::DiscoError,
             )
         ),
@@ -169,7 +170,7 @@ async fn main() {
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
         .nest("/sessions", sessions_routes)
-        .nest("/preferenaces", pref_routes)
+        .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
