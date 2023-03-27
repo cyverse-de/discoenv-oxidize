@@ -51,7 +51,11 @@ For more information on installing Skaffold, see [skaffold.dev](https://skaffold
 * [skaffold.dev](https://skaffold.dev/docs/install/#standalone-binary)
 
 ## Repository Organization
-There main goals of this repo's organization are as follows (in no particular order):
+You're really going to want to read the [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html) and [Workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html) sections of the Cargo Book to understand what is going on in this repo.
+
+Specifically, the top-level directory is a virtual workspace and there are multiple packages defined in the workspace.
+
+The main goals of this repo's organization are as follows (in no particular order):
 * Safely consolidate as many of the microservices as possible.
 * Provide a common set of modules to make creating new microservices fairly easy.
 * Unify domain object representations across service boundaries.
@@ -60,7 +64,7 @@ There main goals of this repo's organization are as follows (in no particular or
 * Still provide enough flexibility to allow for services that deviate from the common set of libraries and practices.
 
 ### Directory Structure
-* `Cargo.toml` - The workspaces Cargo.toml file. Lists which directories are members of the workspace.
+* `Cargo.toml` - The workspace's Cargo.toml file. Lists which directories are members of the workspace.
 * `skaffold.yaml` - The skaffold YAML file for building and deploying container images into k8s.
 * `discoenv/` - The discoenv crate containing the services and shared libraries deployed from this repo.
 * `service_errors/` - A crate containing common error handling code that integrates with the ServiceError type defined by protocol buffer in the `p` repo.
@@ -71,9 +75,18 @@ There main goals of this repo's organization are as follows (in no particular or
 ### Workspace
 The top-level directory of the repository is a Cargo workspace. This allows us to provide multiple Cargo crates from a single repository. The intention is not for every microservice to have its own crate; instead, services should go into the `discoenv` crate inside the workspace. If a service absolutely needs to exist outside of the discoenv crate, then it can still reside inside this workspace as a new crate.
 
-### Discoenv Service
-### Where to put what and when
+### Discoenv Crate
+The `discoenv` crate is where you should put new microservice code by default. If it's relatively simplistic code that provides access to information in the database as JSON, then consider just adding the functionality to the default binary, `discoenv`. If the code is a bit more complicated and would benefit from being able to scale separately from the rest of the services, then put it into a secondary binary in the `discoenv` crate.
+
+The primary binary for the `discoenv` crate is defined in `discoenv/src/main.rs` and is a service that provides access to relatively simple HTTP/JSON code that access the database and return JSON encoded information with minimal processing.
+
+The `user-info` service provides access to `bags`, `sessions`, `preferences`, and `saved-searches` defined by users. It is in the `discoenv/src/bin/user-info/main.rs` file.
+
+The `discoenv/src/lib.rs` file exposes modules that are provided by the `discoenv` library. They can be reused across binaries (a.k.a services) contained within the `discoenv` crate.
+
 ### Sources
+* [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html)
+* [Workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html)
 
 ## Building
 ### Cargo
