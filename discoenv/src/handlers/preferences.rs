@@ -88,7 +88,7 @@ pub async fn add_user_preferences(
     let pref_str =
         serde_json::to_string(&preferences).map_err(|e| DiscoError::BadRequest(e.to_string()))?;
 
-    let id = preferences::add_user_preferences(&mut tx, &username, &pref_str).await?;
+    let id = preferences::add_user_preferences(&mut tx, &user, &pref_str).await?;
 
     tx.commit().await?;
 
