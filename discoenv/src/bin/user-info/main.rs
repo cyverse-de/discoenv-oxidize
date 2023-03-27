@@ -7,7 +7,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::bags;
+use db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
 use service_signals::shutdown_signal;
@@ -82,12 +82,22 @@ async fn main() {
             handlers::bags::get_default_bag,
             handlers::bags::update_default_bag,
             handlers::bags::delete_default_bag,
+            handlers::preferences::get_user_preferences,
+            handlers::preferences::add_user_preferences,
+            handlers::preferences::update_user_preferences,
+            handlers::preferences::delete_user_preferences,
+            handlers::searches::get_saved_searches,
+            handlers::searches::add_saved_searches,
+            handlers::searches::update_saved_searches,
+            handlers::searches::delete_saved_searches,
         ),
         components(
             schemas(
-                handlers::bags::ID,
+                handlers::common::ID,
                 bags::Bag, 
                 bags::Bags, 
+                preferences::Preferences,
+                searches::SavedSearches,
                 service_errors::DiscoError,
             )
         ),
@@ -104,6 +114,33 @@ async fn main() {
             return;
         }
     };
+
+    let pref_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::preferences::get_user_preferences)
+            .put(handlers::preferences::add_user_preferences)
+            .post(handlers::preferences::update_user_preferences)
+            .delete(handlers::preferences::delete_user_preferences)
+        );
+
+    let searches_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::searches::get_saved_searches)
+            .put(handlers::searches::add_saved_searches)
+            .post(handlers::searches::update_saved_searches)
+            .delete(handlers::searches::delete_saved_searches)
+        );
+
+    let sessions_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::sessions::get_user_sessions)
+            .put(handlers::sessions::add_user_sessions)
+            .post(handlers::sessions::update_user_sessions)
+            .delete(handlers::sessions::delete_user_sessions)
+        );
 
     let bag_routes = Router::new()
         .route("/", get(|| async {}))
@@ -131,6 +168,9 @@ async fn main() {
         .route("/", get(|| async {}))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
         .nest("/bags", bag_routes)
+        .nest("/searches", searches_routes)
+        .nest("/sessions", sessions_routes)
+        .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())

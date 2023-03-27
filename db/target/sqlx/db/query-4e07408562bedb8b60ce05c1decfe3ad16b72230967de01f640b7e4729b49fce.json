@@ -1,11 +1,11 @@
 {
-  "query": "select id from users where username = $1",
+  "query": "\n            SELECT COUNT(*) > 0 AS has_session\n            FROM user_sessions\n            JOIN users ON user_sessions.user_id = users.id\n            WHERE users.username = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
-        "type_info": "Uuid"
+        "name": "has_session",
+        "type_info": "Bool"
       }
     ],
     "parameters": {
@@ -14,8 +14,8 @@
       ]
     },
     "nullable": [
-      false
+      null
     ]
   },
-  "hash": "0f6145094007fdced148d362f35ed52145f8fe27520c399f2d05b4b4604d0dae"
+  "hash": "e4e532a503d1c33619d000e1d6203e0e7211c5a2659e5e8f156b5fe772124ba9"
 }

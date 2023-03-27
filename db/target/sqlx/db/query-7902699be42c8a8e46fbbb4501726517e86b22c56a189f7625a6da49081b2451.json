@@ -1,21 +1,33 @@
 {
-  "query": "\n            select COUNT(*) > 0 as has_bags from bags where user_id = $1\n        ",
+  "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.session\n            FROM\n                user_sessions s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "has_bags",
-        "type_info": "Bool"
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "session",
+        "type_info": "Text"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text"
       ]
     },
     "nullable": [
-      null
+      false,
+      false,
+      false
     ]
   },
-  "hash": "fbc831141a0ecf760a5df88f4df85aa95d78e7d28a0f58c35d9164199494c1d7"
+  "hash": "e63a59db1a0f17e00dedf5a523ba9e6d0521a7765784c37181718e684e4b4a6a"
 }

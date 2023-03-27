@@ -3,13 +3,11 @@ use axum::{
     http::StatusCode,
     response,
 };
-use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use sqlx::{
     postgres::PgPool,
     types::{JsonValue, Uuid},
 };
-use utoipa::ToSchema;
 
 
 use db::{bags::{self, Bag}, users};
@@ -17,24 +15,8 @@ use db::bags::{list_user_bags, Bags};
 use service_errors::DiscoError;
 
 use super::config;
+use super::common;
 
-#[derive(Serialize, Deserialize, ToSchema)]
-pub struct ID {
-    pub id: Uuid,
-}
-
-fn fix_username(username: &str, cfg: &config::HandlerConfiguration) -> String {
-    let mut retval: String = username.into();
-
-    if cfg.append_user_domain && !cfg.user_domain.is_empty() && !retval.ends_with(&cfg.user_domain) {
-        if !cfg.user_domain.starts_with("@") {
-            retval = format!("{}@", retval);
-        }
-        retval = format!("{}{}", retval, cfg.user_domain);
-    }
-
-    retval
-}
 
 /// Get all of a user's bags.
 /// 
@@ -63,7 +45,7 @@ pub async fn get_user_bags(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
 ) -> response::Result<Json<Bags>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -100,7 +82,7 @@ pub async fn delete_user_bags(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -139,11 +121,11 @@ pub async fn delete_user_bags(
     tag = "bag"
 )]
 pub  async fn add_user_bag(
-   State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
-) -> response::Result<Json<ID>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+) -> response::Result<Json<common::ID>, DiscoError> {
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -154,7 +136,7 @@ pub  async fn add_user_bag(
 
     tx.commit().await?;
 
-    let b = ID { id: u };
+    let b = common::ID { id: u };
     
     Ok(Json(b))
 }
@@ -184,7 +166,7 @@ pub async fn user_has_bags(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut status_code = StatusCode::OK;
     let has_bag = bags::user_has_bags(&conn, &user).await?;
     if !has_bag {
@@ -218,7 +200,7 @@ pub async fn get_bag(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -257,7 +239,7 @@ pub async fn update_bag(
     Path((username, bag_id)): Path<(String, Uuid)>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -300,7 +282,7 @@ pub async fn delete_bag(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<(), DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -338,7 +320,7 @@ pub async fn get_default_bag(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -382,7 +364,7 @@ pub async fn update_default_bag(
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -425,7 +407,7 @@ pub async fn delete_default_bag(
     State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    let user = fix_username(&username, &cfg);
+    let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
