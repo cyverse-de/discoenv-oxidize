@@ -50,6 +50,8 @@ For more information on installing Skaffold, see [skaffold.dev](https://skaffold
 * [docker.com](https://www.docker.com/)
 * [skaffold.dev](https://skaffold.dev/docs/install/#standalone-binary)
 
+---
+
 ## Repository Organization
 You're really going to want to read the [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html) and [Workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html) sections of the Cargo Book to understand what is going on in this repo.
 
@@ -88,14 +90,55 @@ The `discoenv/src/lib.rs` file exposes modules that are provided by the `discoen
 * [Package Layout](https://doc.rust-lang.org/cargo/guide/project-layout.html)
 * [Workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html)
 
-## Building
+---
+
+## Building and Deploying
+There are two things that need to be built from this repository: binaries and container images. During development, you'll be building binaries pretty regularly. Container images are built if and when you're ready to deploy into a cluster.
+
 ### Cargo
+Cargo is provided by `rustup` and is used to build the Rust services. From the top-level directory run the following to build everything:
+```bash
+cargo build --workspace
+```
+
+If you want to build release versions of the binaries, do the following:
+
+```bash
+cargo build --workspace --release
+```
+
+The binaries will land in the top-level `target` directory. That directory should not be checked in.
+
 ### Docker
-### Skaffold
-### Sources
+If you want to build the container images locally, there are two images to build: `rust-builder` and `disconev-oxidize`. 
 
-## Deploying
-### Kubernetes
-### Skaffold
-### Sources
+`rust-builder` is used to build and cache the dependencies so you don't have to do a full rebuild every time.
 
+`discoenv-oxidize` contains all of the microservice binaries. The Dockerfile for it is multi-stage. 
+
+Hopefully you won't need to do this manually locally unless you're working on the images.
+
+First, build rust-builder:
+```bash
+docker build -t harbor.cyverse.org/de/rust-builder .
+```
+
+Then build the image:
+```bash
+docker build -t harbor.cyverse.org/de/discoenv-oxidize .
+```
+
+### Skaffold
+Skaffold is used to automate building and deploying the images. The k8s resource manifests are located in the `k8s` directory.
+
+Do not run these commands locally if your target environment's processor architecture is different from your local architecture. In other words, don't run this on an M1 or M2 Mac if you're deploying on an x86_64 Linux box.
+
+Build and push the images.
+```bash
+skaffold build --file-output build.json
+```
+
+Deploy the built images.
+```bash
+skaffold deploy -a build.json
+```
