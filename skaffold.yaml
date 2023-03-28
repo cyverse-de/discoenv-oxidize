@@ -10,4 +10,4 @@ build:
   local: {}
 manifests:
     rawYaml:
-      - k8s/user-info.yaml
+      - k8s/discoenv.yaml

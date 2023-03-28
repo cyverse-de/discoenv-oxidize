@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: user-info2
+  name: discoenv
 spec:
   replicas: 2
   selector:
     matchLabels:
-      de-app: user-info2
+      de-app: discoenv
   template:
     metadata:
       labels:
-        de-app: user-info2
+        de-app: discoenv
         app: de
     spec:
       affinity:
@@ -21,7 +21,7 @@ spec:
               - key: de-app
                 operator: In
                 values:
-                - user-info2
+                - discoenv
             topologyKey: kubernetes.io/hostname
       restartPolicy: Always
       volumes:
@@ -41,12 +41,12 @@ spec:
              - key: jobservices.yml
                path: service.yml
       containers:
-      - name: user-info2
+      - name: discoenv
         image: harbor.cyverse.org/de/discoenv-oxidize
         command: ["/user-info"]
         env:
           - name: SERVICE_NAME
-            value: user-info2
+            value: discoenv
           - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
             valueFrom:
               secretKeyRef:
@@ -88,10 +88,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: user-info2
+  name: discoenv
 spec:
   selector:
-    de-app: user-info2
+    de-app: discoenv
   ports:
     - protocol: TCP
       port: 80

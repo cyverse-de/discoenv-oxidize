@@ -12,5 +12,5 @@ COPY . .
 RUN cargo build --workspace --release
 
 FROM gcr.io/distroless/cc
-COPY --from=builder  /usr/src/discoenv-oxidize/target/release/user-info /user-info
+COPY --from=builder  /usr/src/discoenv-oxidize/target/release/discoenv /discoenv
 
