@@ -22,6 +22,13 @@ We're using Rust and Cargo `1.68.1` at the time of this writing.
 
 To install Rust and Cargo for your development environment, go to [rust-lang.org](https://www.rust-lang.org/tools/install) and follow their instructions.
 
+### openssl development libraries
+On Ubuntu or Ubuntu derived Linux distributions, you make need to install the libssl-dev package:
+
+```bash
+sudo apt-get install -y libssl-dev
+```
+
 ### sqlx CLI
 The sqlx library macros `query!` and `query_as!` will both use a connection to a database configured with the `DATABASE_URI` environment variable. You can turn this off either by unsetting that environment variable or by setting the environment variable `SQLX_OFFLINE=true`.
 
