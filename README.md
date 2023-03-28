@@ -6,6 +6,7 @@ A set of services for the Discovery Environment written in Rust.
 You're going to need the following tools to work with the services in this repository.
 * Rust - The Rust programming language.
 * Cargo - Multi-tool for the Rust programming language.
+* sqlx CLI - A command-line tool related to the SQLX crate.
 * protoc - Protocol Buffer compiler.
 * Docker - Needed for building container images.
 * kubectl - Needed for deployments.
@@ -20,6 +21,18 @@ You're going to be using Rust and Cargo a lot if you're developing and/or buildi
 We're using Rust and Cargo `1.68.1` at the time of this writing.
 
 To install Rust and Cargo for your development environment, go to [rust-lang.org](https://www.rust-lang.org/tools/install) and follow their instructions.
+
+### sqlx CLI
+The sqlx library macros `query!` and `query_as!` will both use a connection to a database configured with the `DATABASE_URI` environment variable. You can turn this off either by unsetting that environment variable or by setting the environment variable `SQLX_OFFLINE=true`.
+
+Connecting to a database during the CI/CD process would be a problem, so you'll need to install the sqlx CLI and use it to serialize query information that can be used during compilation. Documentation for installing the sqlx CLI is available on [github.com](https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md).
+
+To serialize the queries, do the following:
+```bash
+cargo sqlx prepare --merged
+```
+
+NOTE: The sqlx docs say to use the `--workspace` flag instead of `--merged`, but the tool itself said to use `--merged`. YMMV.
 
 ### protoc
 protoc is the protocol buffer compiler. You're going to need to have it installed and in your path in order to build all of the dependencies for the project.
