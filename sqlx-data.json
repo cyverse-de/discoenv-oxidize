@@ -220,6 +220,27 @@
     },
     "query": "\n            delete from bags where user_id = (select id from users where username = $1)\n        "
   },
+  "48d835d4537798ff96e2bbe9a43e63820d03321b2c60307a490fdfb3000ec4f7": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO user_sessions\n                (user_id, session)\n            VALUES\n                ((SELECT id FROM users WHERE username = $1), $2)\n            RETURNING id\n        "
+  },
   "5065c4710e2ee0ee5e61d3b2786d8ad51d9c33a0ea36d93e5efa154b38e5e3fa": {
     "describe": {
       "columns": [
@@ -259,19 +280,6 @@
       }
     },
     "query": "select count(*) > 0 as has_user from users where username = $1"
-  },
-  "637f077030c3f206b7681552deaecadb2478a177cb1add4741d207ab783d9ddb": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Uuid"
-        ]
-      }
-    },
-    "query": "\n            DELETE FROM user_preferences \n            WHERE id = $2 \n            AND user_id = (\n                SELECT id \n                FROM users \n                WHERE username = $1\n            )\n        "
   },
   "6acdb76d612d61365fa4e5a2e09ddcbebc452a633d082096c88ae966947819a1": {
     "describe": {
@@ -318,18 +326,17 @@
     },
     "query": "update bags set contents = $2 where id = $1"
   },
-  "7e1ea6c33193a9230370d929360a237b5903c72aceff4a8ae894ba2049660ded": {
+  "85f9a5a811c82a8ecc2cc8ae5d136fc0923d47d0754281d588b8b797b0feed6a": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
         "Left": [
-          "Text",
-          "Uuid"
+          "Text"
         ]
       }
     },
-    "query": "\n            DELETE FROM user_saved_searches\n            WHERE user_saved_searches.id = $2\n            AND user_saved_searches.user_id = (SELECT id FROM users WHERE username = $1)\n        "
+    "query": "\n            DELETE FROM user_preferences \n            WHERE user_id = (\n                SELECT id \n                FROM users \n                WHERE username = $1\n            )\n        "
   },
   "8c0d2facae6c05ac961da9c5ccd2f4da99f293b63487c0ba5a8e724a2b40b473": {
     "describe": {
@@ -362,6 +369,19 @@
       }
     },
     "query": "\n            select \n                bags.id, \n                user_id, \n                contents as \"contents: Json<Map<String, JsonValue>>\" \n            from bags\n            join users on users.id = bags.user_id \n            where users.username = $1\n        "
+  },
+  "9003a81e06b921df57bb743ebc6ed119b6f13870913dae4cca25e934d946375a": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            UPDATE ONLY user_sessions\n            SET session = $2\n            FROM users\n            WHERE user_sessions.user_id = users.id\n            AND users.username = $1\n        "
   },
   "916ed9f300dc441a1924a5320c97cd894a049b06a4f0de162eb7c8a894271657": {
     "describe": {
@@ -464,6 +484,18 @@
     },
     "query": "\n            SELECT COUNT(*) > 0 AS has_saved_searches\n            FROM user_saved_searches\n            JOIN users ON user_saved_searches.user_id = users.id\n            WHERE users.username = $1\n        "
   },
+  "b0e3e81682eb90df49f5b82e722a8aa53a6ac2cbc3c1e37ed410fc7ede279b33": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            DELETE FROM user_sessions\n            WHERE user_sessions.user_id = (SELECT id FROM users WHERE username = $1)\n        "
+  },
   "bebcc1dfc4c089a554be1962fedc964be3cb1772129b84bca8e8e0d2d68295e9": {
     "describe": {
       "columns": [
@@ -483,6 +515,18 @@
       }
     },
     "query": "\n            SELECT COUNT(*) > 0 AS has_preferences\n            FROM user_preferences\n            JOIN users ON user_preferences.user_id = users.id\n            AND users.username = $1\n        "
+  },
+  "c11000fe0bcd6dd65d7d246f2ee9df4dd4077dd5e17953e6ab68baa6eda4a397": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            DELETE FROM user_saved_searches\n            WHERE user_id = (SELECT id FROM users WHERE username = $1)\n        "
   },
   "c5c3b196fa51f2ae6960ae2a4fba89230f47ec905a50a8ef58f926f6f81c0381": {
     "describe": {
@@ -516,6 +560,58 @@
       }
     },
     "query": "select count(*) > 0 as has_user from users where id = $1"
+  },
+  "e4e532a503d1c33619d000e1d6203e0e7211c5a2659e5e8f156b5fe772124ba9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "has_session",
+          "ordinal": 0,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT COUNT(*) > 0 AS has_session\n            FROM user_sessions\n            JOIN users ON user_sessions.user_id = users.id\n            WHERE users.username = $1\n        "
+  },
+  "e63a59db1a0f17e00dedf5a523ba9e6d0521a7765784c37181718e684e4b4a6a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 1,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "session",
+          "ordinal": 2,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT\n                s.id,\n                s.user_id,\n                s.session\n            FROM\n                user_sessions s\n            JOIN users u ON s.user_id = u.id\n            WHERE u.username = $1\n        "
   },
   "e785b7d74ded09e66699287827dc15b322ddfa5255b68713ee308740a948ae4f": {
     "describe": {
