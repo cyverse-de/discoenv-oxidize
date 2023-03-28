@@ -15,6 +15,14 @@ You're going to need the following tools to work with the services in this repos
 
 If you're just interested in dealing with the code, then you only need Rust, Cargo, and protoc.
 
+### TL;DR (for MacOS and Linux)
+* Install and configure homebrew.
+* Use rustup to install Rust and Cargo.
+* `cargo install sqlx-cli`
+* `brew install protobuf podman skaffold kubectl golang-migrate`
+* `export DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/de?sslmode=disable`
+* `cargo build --workspace`
+
 ### Rust & Cargo
 You're going to be using Rust and Cargo a lot if you're developing and/or building the projects in this repo, so make sure you have them installed and in your $PATH.
 
@@ -51,11 +59,18 @@ For this repository, you just need the `protoc` compiler, the plugins needed by 
 See the installation instructions [here](https://grpc.io/docs/protoc-installation/) for more information.
 
 ### Docker
-Docker is mainly used to prepare the services for deployment. You don't necessarily need to have it installed if you're just writing code, but if you want to build and deploy the services into a Kubernetes cluster, then you're going to want it (or Buildah).
+Docker is mainly used to prepare the services for deployment. You don't necessarily need to have it installed if you're just writing code, but if you want to build and deploy the services into a Kubernetes cluster, then you're going to want it (or podman, or buildah).
 
 Just use a reasonably up to date version of Docker. If you're on MacOS, use Docker Desktop.
 
 See [docker.com](https://www.docker.com/) for more information.
+
+On Linux Mint or other Ubuntu derived Linux distributions, you can use podman to create and push images. I recommend using homebrew to install it (yes, on a Linux box):
+```bash
+sudo apt-get install -y uidmap
+brew install podman
+```
+Information on how to install homebrew on a Linux box is available here: [brew.sh](https://brew.sh/).
 
 ### Skaffold
 Skaffold is a tool for building the container images and deploying them into the cluster. If you're not involved with building or deploying the container images, then you don't need it.
@@ -68,6 +83,7 @@ For more information on installing Skaffold, see [skaffold.dev](https://skaffold
 * [rust-lang.org](https://www.rust-lang.org/tools/install)
 * [grpc.io](https://grpc.io/docs/protoc-installation/)
 * [docker.com](https://www.docker.com/)
+* [brew.sh](https://brew.sh/)
 * [skaffold.dev](https://skaffold.dev/docs/install/#standalone-binary)
 
 ---
