@@ -561,6 +561,266 @@
     },
     "query": "select count(*) > 0 as has_user from users where id = $1"
   },
+  "c67dafb8dba58a01cf26ac64b889e4f4f14cf298a084a1c2179e6f5965070bf3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "job_name",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "job_description",
+          "ordinal": 2,
+          "type_info": "Text"
+        },
+        {
+          "name": "app_name",
+          "ordinal": 3,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "job_type_id",
+          "ordinal": 4,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "app_id",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "app_wiki_url",
+          "ordinal": 6,
+          "type_info": "Text"
+        },
+        {
+          "name": "app_description",
+          "ordinal": 7,
+          "type_info": "Text"
+        },
+        {
+          "name": "result_folder_path",
+          "ordinal": 8,
+          "type_info": "Text"
+        },
+        {
+          "name": "start_date",
+          "ordinal": 9,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "end_date",
+          "ordinal": 10,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "planned_end_date",
+          "ordinal": 11,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "status",
+          "ordinal": 12,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "deleted",
+          "ordinal": 13,
+          "type_info": "Bool"
+        },
+        {
+          "name": "notify",
+          "ordinal": 14,
+          "type_info": "Bool"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 15,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "subdomain",
+          "ordinal": 16,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "submission",
+          "ordinal": 17,
+          "type_info": "Json"
+        },
+        {
+          "name": "parent_id",
+          "ordinal": 18,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "millicores_reserved",
+          "ordinal": 19,
+          "type_info": "Int4"
+        },
+        {
+          "name": "app_version_id",
+          "ordinal": 20,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "users_id",
+          "ordinal": 21,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "users_username",
+          "ordinal": 22,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "apps_id",
+          "ordinal": 23,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "apps_name",
+          "ordinal": 24,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "apps_description",
+          "ordinal": 25,
+          "type_info": "Text"
+        },
+        {
+          "name": "apps_wiki_url",
+          "ordinal": 26,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "job_types_id",
+          "ordinal": 27,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "job_types_name",
+          "ordinal": 28,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "job_types_system_id",
+          "ordinal": 29,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "av_id",
+          "ordinal": 30,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "av_app_id",
+          "ordinal": 31,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "av_version",
+          "ordinal": 32,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "av_version_order",
+          "ordinal": 33,
+          "type_info": "Int4"
+        },
+        {
+          "name": "av_deleted",
+          "ordinal": 34,
+          "type_info": "Bool"
+        },
+        {
+          "name": "av_disabled",
+          "ordinal": 35,
+          "type_info": "Bool"
+        },
+        {
+          "name": "av_integration_date",
+          "ordinal": 36,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "av_edited_date",
+          "ordinal": 37,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "integration_data_id",
+          "ordinal": 38,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "integrator_name",
+          "ordinal": 39,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "integrator_email",
+          "ordinal": 40,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT \n                j.*,\n                u.id                  as users_id,\n                u.username            as users_username,\n                a.id                  as apps_id,\n                a.name                as apps_name,\n                a.description         as apps_description,\n                a.wiki_url            as apps_wiki_url,\n                t.id                  as job_types_id,\n                t.name                as job_types_name,\n                t.system_id           as job_types_system_id,\n                av.id                 as av_id,\n                av.app_id             as av_app_id,\n                av.version            as av_version,\n                av.version_order      as av_version_order,\n                av.deleted            as av_deleted,\n                av.disabled           as av_disabled,\n                av.integration_date   as av_integration_date,\n                av.edited_date        as av_edited_date,\n                intd.id               as integration_data_id,\n                intd.integrator_name  as integrator_name,\n                intd.integrator_email as integrator_email\n            FROM jobs j\n            JOIN users u ON u.id = j.user_id\n            JOIN job_types t ON j.job_type_id = t.id\n            JOIN app_versions av ON j.app_version_id = av.id\n            JOIN apps a ON av.app_id = a.id\n            JOIN integration_data intd on av.integration_data_id = intd.id\n            WHERE u.username = $1\n        "
+  },
   "e4e532a503d1c33619d000e1d6203e0e7211c5a2659e5e8f156b5fe772124ba9": {
     "describe": {
       "columns": [
