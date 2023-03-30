@@ -1,5 +1,3 @@
-extern crate service_signals;
-
 use axum::{
     routing::get,
     Router,
@@ -9,13 +7,13 @@ use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use service_signals::shutdown_signal;
 use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use discoenv::handlers;
 use discoenv::errors;
+use discoenv::handlers;
+use discoenv::signals::shutdown_signal;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
