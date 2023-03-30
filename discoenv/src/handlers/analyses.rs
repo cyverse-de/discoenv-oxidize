@@ -4,7 +4,7 @@ use axum::{
 };
 use sqlx::postgres::PgPool;
 
-use db::analyses;
+use crate::db::analyses;
 
 use debuff::analysis;
 use service_errors::DiscoError;

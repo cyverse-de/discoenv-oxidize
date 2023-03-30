@@ -10,8 +10,8 @@ use sqlx::{
 };
 
 
-use db::{bags::{self, Bag}, users};
-use db::bags::{list_user_bags, Bags};
+use crate::db::{bags::{self, Bag}, users};
+use crate::db::bags::{list_user_bags, Bags};
 use service_errors::DiscoError;
 
 use super::config;

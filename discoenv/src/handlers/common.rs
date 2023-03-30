@@ -1,5 +1,5 @@
 use super::config;
-use db::users;
+use crate::db::users;
 use serde::{Deserialize, Serialize};
 use service_errors::DiscoError;
 use sqlx::types::Uuid;

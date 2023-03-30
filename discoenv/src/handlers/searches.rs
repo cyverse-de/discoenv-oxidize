@@ -6,8 +6,8 @@ use axum::{
 use serde_json::Map;
 use sqlx::{postgres::PgPool, types::JsonValue};
 
-use db::searches::{self, SavedSearches};
-use db::users;
+use crate::db::searches::{self, SavedSearches};
+use crate::db::users;
 use service_errors::DiscoError;
 
 use super::common;

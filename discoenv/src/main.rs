@@ -1,4 +1,3 @@
-extern crate db;
 extern crate service_signals;
 
 use axum::{
@@ -7,7 +6,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use db::{bags, preferences, searches};
+use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
 use service_signals::shutdown_signal;

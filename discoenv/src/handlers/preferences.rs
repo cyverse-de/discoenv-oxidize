@@ -6,8 +6,8 @@ use serde_json::Map;
 use service_errors::DiscoError;
 use sqlx::{postgres::PgPool, types::JsonValue};
 
-use db::preferences::{self, Preferences};
-use db::users;
+use crate::db::preferences::{self, Preferences};
+use crate::db::users;
 
 use super::common;
 use super::config;
