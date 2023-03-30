@@ -1,5 +1,7 @@
 use super::config;
+use db::users;
 use serde::{Deserialize, Serialize};
+use service_errors::DiscoError;
 use sqlx::types::Uuid;
 use utoipa::ToSchema;
 
@@ -20,4 +22,21 @@ pub fn fix_username(username: &str, cfg: &config::HandlerConfiguration) -> Strin
     }
 
     retval
+}
+
+pub async fn validate_username<'a, E>(
+    conn: E,
+    username: &str,
+    cfg: &config::HandlerConfiguration,
+) -> Result<String, DiscoError>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    let user = fix_username(&username, &cfg);
+
+    if !users::username_exists(conn, &user).await? {
+        return Err(DiscoError::NotFound(format!("user {} was not found", user)));
+    }
+
+    Ok(user)
 }
