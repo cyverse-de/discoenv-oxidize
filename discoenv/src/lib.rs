@@ -1,4 +1,5 @@
 pub mod handlers {
+    pub mod analyses;
     pub mod bags;
     pub mod common;
     pub mod config;

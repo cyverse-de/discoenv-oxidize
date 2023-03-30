@@ -54,8 +54,6 @@ async fn main() {
     let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
     let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
 
-    println!("database URL: {}", cfg.db.uri);
-
     let pool = match PgPool::connect(&cfg.db.uri).await {
         Ok(pool) => pool,
         Err(e) => {
@@ -72,6 +70,7 @@ async fn main() {
     #[derive(OpenApi)]
     #[openapi(
         paths(
+            handlers::analyses::get_user_analyses,
             handlers::bags::get_user_bags,
             handlers::bags::delete_user_bags,
             handlers::bags::add_user_bag,
@@ -164,9 +163,16 @@ async fn main() {
                 .delete(handlers::bags::delete_bag),
         );
 
+    let analyses_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::analyses::get_user_analyses)
+        );
+
     let app = Router::new()
         .route("/", get(|| async {}))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .nest("/analyses", analyses_routes)
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
         .nest("/sessions", sessions_routes)
