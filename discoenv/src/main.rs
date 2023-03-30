@@ -54,8 +54,6 @@ async fn main() {
     let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
     let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
 
-    println!("database URL: {}", cfg.db.uri);
-
     let pool = match PgPool::connect(&cfg.db.uri).await {
         Ok(pool) => pool,
         Err(e) => {
