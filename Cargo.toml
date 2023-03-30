@@ -2,6 +2,5 @@
 
 members = [
 	"discoenv",
-	"service_errors",
 	"service_signals",
 ]

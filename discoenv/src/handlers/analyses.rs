@@ -7,7 +7,7 @@ use sqlx::postgres::PgPool;
 use crate::db::analyses;
 
 use debuff::analysis;
-use service_errors::DiscoError;
+use crate::errors::DiscoError;
 
 use super::common;
 use super::config;

@@ -12,7 +12,7 @@ use sqlx::{
 
 use crate::db::{bags::{self, Bag}, users};
 use crate::db::bags::{list_user_bags, Bags};
-use service_errors::DiscoError;
+use crate::errors::DiscoError;
 
 use super::config;
 use super::common;

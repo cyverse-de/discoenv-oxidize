@@ -8,7 +8,7 @@ use sqlx::{postgres::PgPool, types::JsonValue};
 
 use crate::db::searches::{self, SavedSearches};
 use crate::db::users;
-use service_errors::DiscoError;
+use crate::errors::DiscoError;
 
 use super::common;
 use super::config;

@@ -8,15 +8,14 @@ use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trac
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
-use serde_yaml::{self};
+use serde_yaml;
 use service_signals::shutdown_signal;
-use sqlx::{
-    postgres::PgPool,
-};
+use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use discoenv::handlers;
+use discoenv::errors;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -96,7 +95,7 @@ async fn main() {
                 bags::Bags, 
                 preferences::Preferences,
                 searches::SavedSearches,
-                service_errors::DiscoError,
+                errors::DiscoError,
             )
         ),
         tags(

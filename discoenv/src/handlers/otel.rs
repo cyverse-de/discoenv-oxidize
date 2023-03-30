@@ -2,7 +2,7 @@ use axum::{extract::Json, response};
 use serde::Serialize;
 use utoipa::ToSchema;
 
-use service_errors::DiscoError;
+use crate::errors::DiscoError;
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OtelReport {

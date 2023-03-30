@@ -3,11 +3,11 @@ use axum::{
     response,
 };
 use serde_json::Map;
-use service_errors::DiscoError;
 use sqlx::{postgres::PgPool, types::JsonValue};
 
 use crate::db::sessions::{self, Session};
 use crate::db::users;
+use crate::errors::DiscoError;
 
 use super::common;
 use super::config;
