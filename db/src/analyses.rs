@@ -86,6 +86,13 @@ where
             analysis.deleted = r.deleted;
             analysis.notify = r.notify;
             analysis.result_folder_path = r.result_folder_path.unwrap_or_default();
+            analysis.status = r.status;
+            analysis.subdomain = r.subdomain.unwrap_or_default();
+            analysis.parent_id = r.parent_id.unwrap_or_default().to_string();
+            analysis.millicores_reserved = r.millicores_reserved.into();
+            analysis.start_date = Some(convert_ts(r.start_date.unwrap_or_default()));
+            analysis.end_date = Some(convert_ts(r.end_date.unwrap_or_default()));
+            analysis.planned_end_date = Some(convert_ts(r.planned_end_date.unwrap_or_default()));
 
             user.uuid = r.users_id.to_string();
             user.username = r.users_username;
