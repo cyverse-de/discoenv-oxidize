@@ -164,9 +164,16 @@ async fn main() {
                 .delete(handlers::bags::delete_bag),
         );
 
+    let analyses_routes = Router::new()
+        .route(
+            "/:username",
+            get(handlers::analyses::get_user_analyses)
+        );
+
     let app = Router::new()
         .route("/", get(|| async {}))
         .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .nest("/analyses", analyses_routes)
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
         .nest("/sessions", sessions_routes)
