@@ -24,7 +24,19 @@ where
     let records = query!(
         r#"
             SELECT 
-                j.*,
+                j.id,
+                j.job_name,
+                j.job_description,
+                j.result_folder_path,
+                j.start_date,
+                j.end_date,
+                j.planned_end_date,
+                j.status,
+                j.deleted,
+                j.notify,
+                j.subdomain,
+                j.parent_id,
+                j.millicores_reserved,
                 u.id                  as users_id,
                 u.username            as users_username,
                 a.id                  as apps_id,
@@ -71,6 +83,9 @@ where
             analysis.id = r.id.to_string();
             analysis.name = r.job_name;
             analysis.description = r.job_description.unwrap_or("".to_owned());
+            analysis.deleted = r.deleted;
+            analysis.notify = r.notify;
+            analysis.result_folder_path = r.result_folder_path.unwrap_or_default();
 
             user.uuid = r.users_id.to_string();
             user.username = r.users_username;

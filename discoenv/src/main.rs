@@ -70,6 +70,7 @@ async fn main() {
     #[derive(OpenApi)]
     #[openapi(
         paths(
+            handlers::analyses::get_user_analyses,
             handlers::bags::get_user_bags,
             handlers::bags::delete_user_bags,
             handlers::bags::add_user_bag,
