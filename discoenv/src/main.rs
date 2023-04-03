@@ -1,3 +1,4 @@
+use futures::stream::StreamExt;
 use axum::{
     routing::get,
     Router,
@@ -14,6 +15,7 @@ use anyhow::{Result, Context, anyhow};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
+use debuff::user;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -178,6 +180,27 @@ async fn main() -> Result<()> {
     let nats_client = async_nats::connect(cfg.nats.server_urls)
         .await
         .context("failed to connect to nats")?;
+
+    tokio::spawn({
+        let client = nats_client.clone();
+
+        async move {
+            let mut subscriber = client.subscribe("cyverse.discoenv.analyses.get".into()).await?;
+
+            while let Some(message) = subscriber.next().await {
+                tokio::spawn({
+                    async move {
+                        if let Ok(req) = serde_json::from_slice::<user::User>(&message.payload) {
+                            println!("received user from={}", req.username);
+                        }
+                    }
+                });
+            }
+
+            Ok::<(), anyhow::Error>(())
+        }
+    });
+
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
