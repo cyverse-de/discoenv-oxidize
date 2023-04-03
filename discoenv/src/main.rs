@@ -10,7 +10,7 @@ use serde_yaml;
 use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-
+use anyhow::{Result, Context, anyhow};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
@@ -38,27 +38,27 @@ struct ConfigUsers {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct ConfigNATS {
+    server_urls: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct Config {
     db: ConfigDB, 
     users: ConfigUsers,
+    nats: ConfigNATS, 
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
     let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
 
-    let pool = match PgPool::connect(&cfg.db.uri).await {
-        Ok(pool) => pool,
-        Err(e) => {
-            println!("error connecting to the database: {}", e);
-            return;
-        }
-    };
+    let pool = PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?;
 
-    let cfg = handlers::config::HandlerConfiguration{
+    let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
     };
@@ -102,13 +102,8 @@ async fn main() {
     )]
 
     struct ApiDoc;
-    match axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers() {
-        Ok(_) => {}
-        Err(e) => {
-            println!("error setting up opentelemetry: {}", e);
-            return;
-        }
-    };
+    axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
+        .map_err(|e| anyhow!(format!("{:?}", e)))? ;
 
     let pref_routes = Router::new()
         .route(
@@ -176,25 +171,18 @@ async fn main() {
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
-        .with_state((pool, cfg));
+        .with_state((pool, handler_config));
 
-    let addr = match "0.0.0.0:60000".parse() {
-        Ok(v) => v,
-        Err(e) => {
-            println!("error parsing address: {:?}", e);
-            return;
-        }
-    };
+    let addr = "0.0.0.0:60000".parse()?;
 
-    match axum::Server::bind(&addr)
+    let nats_client = async_nats::connect(cfg.nats.server_urls)
+        .await
+        .context("failed to connect to nats")?;
+
+    axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_signal())
-        .await
-    {
-        Ok(_) => {}
-        Err(e) => {
-            println!("{:?}", e);
-            return;
-        }
-    };
+        .await?;
+
+    Ok(())
 }
