@@ -227,6 +227,7 @@ async fn main() -> Result<()> {
 
     let nats_client = ConnectOptions::with_credentials_file(cfg.nats.creds.into()).await?
         .require_tls(cfg.nats.tls.enabled)
+        .add_root_certificates(cfg.nats.tls.ca.into())
         .add_client_certificate(
             cfg.nats.tls.crt.into(),
             cfg.nats.tls.key.into()
