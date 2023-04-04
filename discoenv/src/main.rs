@@ -1,4 +1,5 @@
 use futures::stream::StreamExt;
+use futures::future::Future;
 use axum::{
     routing::get,
     Router,
@@ -16,6 +17,7 @@ use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
 use debuff::user;
+use tokio::task::spawn;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -49,6 +51,39 @@ struct Config {
     db: ConfigDB, 
     users: ConfigUsers,
     nats: ConfigNATS, 
+}
+
+async fn subscribe<F, Ft>(client: async_nats::Client, subject: &str, handler: F) -> Result<(), anyhow::Error> 
+where
+    F: Fn(async_nats::Client, async_nats::message::Message) -> Ft,
+    Ft: Future<Output = Result<(), anyhow::Error>> + Send,
+{
+    let mut subscriber = client.subscribe(subject.into()).await?;
+
+    while let Some(msg) = subscriber.next().await {
+        let cl = client.clone();
+        handler(cl, msg).await?;
+    }
+
+    Ok::<(), anyhow::Error>(())
+}
+
+async fn handle_analysis_request(client: async_nats::Client, msg: async_nats::message::Message) -> Result<(), anyhow::Error> {
+    spawn({
+        let client = client.clone();
+
+        async move {
+            if let Ok(req) = serde_json::from_slice::<user::User>(&msg.payload) {
+                println!("received user from={}", req.username);
+                
+                let outgoing = serde_json::json!(&req).as_str().unwrap_or_default().to_owned();
+                client.publish(msg.reply.unwrap_or_default(), outgoing.into()).await?;
+            }
+
+            Ok::<(), anyhow::Error>(())
+
+        }
+    }).await?
 }
 
 #[tokio::main]
@@ -185,18 +220,7 @@ async fn main() -> Result<()> {
         let client = nats_client.clone();
 
         async move {
-            let mut subscriber = client.subscribe("cyverse.discoenv.analyses.get".into()).await?;
-
-            while let Some(message) = subscriber.next().await {
-                tokio::spawn({
-                    async move {
-                        if let Ok(req) = serde_json::from_slice::<user::User>(&message.payload) {
-                            println!("received user from={}", req.username);
-                        }
-                    }
-                });
-            }
-
+            subscribe(client, "cyverse.discoenv.analyses.get".into(), handle_analysis_request).await?;
             Ok::<(), anyhow::Error>(())
         }
     });
