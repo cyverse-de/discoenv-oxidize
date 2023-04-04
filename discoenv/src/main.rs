@@ -1,5 +1,6 @@
 use futures::stream::StreamExt;
 use futures::future::Future;
+use async_nats::{Client, message::Message, ConnectOptions};
 use axum::{
     routing::get,
     Router,
@@ -42,8 +43,20 @@ struct ConfigUsers {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+struct ConfigNatsTls{
+    enabled: bool,
+    crt: String,
+    key: String,
+    ca: String
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct ConfigNATS {
-    server_urls: String
+    server_urls: String,
+    creds: String,
+    max_reconnects: u32,
+    reconnect_wait: u32,
+    tls: ConfigNatsTls
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -53,9 +66,9 @@ struct Config {
     nats: ConfigNATS, 
 }
 
-async fn subscribe<F, Ft>(client: async_nats::Client, subject: &str, handler: F) -> Result<(), anyhow::Error> 
+async fn subscribe<F, Ft>(client: Client, subject: &str, handler: F) -> Result<(), anyhow::Error> 
 where
-    F: Fn(async_nats::Client, async_nats::message::Message) -> Ft,
+    F: Fn(Client, Message) -> Ft,
     Ft: Future<Output = Result<(), anyhow::Error>> + Send,
 {
     let mut subscriber = client.subscribe(subject.into()).await?;
@@ -68,7 +81,7 @@ where
     Ok::<(), anyhow::Error>(())
 }
 
-async fn handle_analysis_request(client: async_nats::Client, msg: async_nats::message::Message) -> Result<(), anyhow::Error> {
+async fn handle_analysis_request(client: Client, msg: Message) -> Result<(), anyhow::Error> {
     spawn({
         let client = client.clone();
 
@@ -212,9 +225,14 @@ async fn main() -> Result<()> {
 
     let addr = "0.0.0.0:60000".parse()?;
 
-    let nats_client = async_nats::connect(cfg.nats.server_urls)
-        .await
-        .context("failed to connect to nats")?;
+    let nats_client = ConnectOptions::with_credentials_file(cfg.nats.creds.into()).await?
+        .require_tls(cfg.nats.tls.enabled)
+        .add_client_certificate(
+            cfg.nats.tls.crt.into(),
+            cfg.nats.tls.key.into()
+        )
+        .connect(cfg.nats.server_urls)
+        .await?;
 
     tokio::spawn({
         let client = nats_client.clone();
@@ -224,7 +242,6 @@ async fn main() -> Result<()> {
             Ok::<(), anyhow::Error>(())
         }
     });
-
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
