@@ -3,11 +3,12 @@ use axum::{
     response,
 };
 use sqlx::postgres::PgPool;
+use std::sync::Arc;
 
 use crate::db::analyses;
 
-use debuff::analysis;
 use crate::errors::DiscoError;
+use debuff::analysis;
 
 use super::common;
 use super::config;
@@ -33,7 +34,7 @@ use super::config;
     tag = "analyses"
 )]
 pub async fn get_user_analyses(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Vec<analysis::Analysis>>, DiscoError> {
     let mut tx = conn.begin().await?;

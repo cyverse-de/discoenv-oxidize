@@ -5,6 +5,7 @@ use axum::{
 };
 use serde_json::Map;
 use sqlx::{postgres::PgPool, types::JsonValue};
+use std::sync::Arc;
 
 use crate::db::searches::{self, SavedSearches};
 use crate::db::users;
@@ -37,7 +38,7 @@ use super::config;
     tag = "searches"
 )]
 pub async fn get_saved_searches(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -73,12 +74,12 @@ pub async fn get_saved_searches(
     tag = "searches"
 )]
 pub async fn has_saved_searches(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
     let user = common::fix_username(&username, &cfg);
     let mut status_code = StatusCode::OK;
-    let has_saved_searches = searches::has_saved_searches(&conn, &user).await?;
+    let has_saved_searches = searches::has_saved_searches(conn.as_ref(), &user).await?;
     if !has_saved_searches {
         status_code = StatusCode::NOT_FOUND;
     }
@@ -110,7 +111,7 @@ pub async fn has_saved_searches(
     tag = "searches"
 )]
 pub async fn add_saved_searches(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
@@ -151,7 +152,7 @@ pub async fn add_saved_searches(
     tag = "searches"
 )]
 pub async fn update_saved_searches(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
@@ -192,7 +193,7 @@ pub async fn update_saved_searches(
     tag = "searches"
 )]
 pub async fn delete_saved_searches(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);

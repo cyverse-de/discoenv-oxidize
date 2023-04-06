@@ -4,6 +4,7 @@ use axum::{
 };
 use serde_json::Map;
 use sqlx::{postgres::PgPool, types::JsonValue};
+use std::sync::Arc;
 
 use crate::db::preferences::{self, Preferences};
 use crate::db::users;
@@ -35,7 +36,7 @@ use super::config;
     tag = "preferences"
 )]
 pub async fn get_user_preferences(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Preferences>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -74,7 +75,7 @@ pub async fn get_user_preferences(
 
 )]
 pub async fn add_user_preferences(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
     Json(preferences): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
@@ -122,7 +123,7 @@ pub async fn add_user_preferences(
     tag = "preferences"
 )]
 pub async fn update_user_preferences(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
     Json(preferences): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Preferences>, DiscoError> {
@@ -170,7 +171,7 @@ pub async fn update_user_preferences(
 
 )]
 pub async fn delete_user_preferences(
-    State((conn, cfg)): State<(PgPool, config::HandlerConfiguration)>,
+    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);

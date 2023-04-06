@@ -1,13 +1,15 @@
+use discoenv::errors::DiscoError;
+use discoenv::handlers::common;
+use discoenv::handlers::config;
 use futures::stream::StreamExt;
-use futures::future::Future;
-use async_nats::{Client, message::Message, ConnectOptions};
+use async_nats::ConnectOptions;
 use axum::{
     routing::get,
     Router,
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use discoenv::db::{bags, preferences, searches};
+use discoenv::db::{bags, preferences, searches, analyses};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use sqlx::postgres::PgPool;
@@ -17,8 +19,8 @@ use anyhow::{Result, Context, anyhow};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
-use debuff::user;
-use tokio::task::spawn;
+use debuff::{self, requests};
+use std::sync::Arc;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -45,17 +47,17 @@ struct ConfigUsers {
 #[derive(Debug, Serialize, Deserialize)]
 struct ConfigNatsTls{
     enabled: bool,
-    crt: String,
-    key: String,
-    ca: String
+    crt: Option<String>,
+    key: Option<String>,
+    ca: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ConfigNATS {
     server_urls: String,
-    creds: String,
-    max_reconnects: u32,
-    reconnect_wait: u32,
+    creds: Option<String>,
+    max_reconnects: Option<u32>,
+    reconnect_wait: Option<u32>,
     tls: ConfigNatsTls
 }
 
@@ -66,37 +68,25 @@ struct Config {
     nats: ConfigNATS, 
 }
 
-async fn subscribe<F, Ft>(client: Client, subject: &str, handler: F) -> Result<(), anyhow::Error> 
-where
-    F: Fn(Client, Message) -> Ft,
-    Ft: Future<Output = Result<(), anyhow::Error>> + Send,
-{
-    let mut subscriber = client.subscribe(subject.into()).await?;
+async fn handle_analysis_request(payload: &[u8], db: &PgPool, cfg: &config::HandlerConfiguration) -> Result<debuff::analysis::AnalysisRecordList, DiscoError> {
+    let mut tx = db.begin().await?;
 
-    while let Some(msg) = subscriber.next().await {
-        let cl = client.clone();
-        handler(cl, msg).await?;
-    }
+    let req = serde_json::from_slice::<requests::ByUsername>(payload).map_err(|e| {
+        DiscoError::UnmarshalFailure(e.to_string())
+    })?;
 
-    Ok::<(), anyhow::Error>(())
-}
+    println!("received user from={}", req.username);
 
-async fn handle_analysis_request(client: Client, msg: Message) -> Result<(), anyhow::Error> {
-    spawn({
-        let client = client.clone();
+    println!("before validate_username");
+    let user = common::validate_username(&mut tx, &req.username, &cfg).await?;
+    
+    println!("after validate_username");
+    let analyses = analyses::get_user_analyses(&mut tx, &user).await?;
+    let mut resp = debuff::analysis::AnalysisRecordList::default();
+    resp.analyses = analyses;
 
-        async move {
-            if let Ok(req) = serde_json::from_slice::<user::User>(&msg.payload) {
-                println!("received user from={}", req.username);
-                
-                let outgoing = serde_json::json!(&req).as_str().unwrap_or_default().to_owned();
-                client.publish(msg.reply.unwrap_or_default(), outgoing.into()).await?;
-            }
-
-            Ok::<(), anyhow::Error>(())
-
-        }
-    }).await?
+    Ok(resp)
+    
 }
 
 #[tokio::main]
@@ -106,12 +96,14 @@ async fn main() -> Result<()> {
     let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
     let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
 
-    let pool = PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?;
+    let pool = Arc::new(PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?);
 
     let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
     };
+
+    let nats_handler_config = handler_config.clone();
 
     #[derive(OpenApi)]
     #[openapi(
@@ -221,28 +213,72 @@ async fn main() -> Result<()> {
         .route("/otel", get(handlers::otel::report_otel))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
-        .with_state((pool, handler_config));
+        .with_state((pool.clone(), handler_config));
 
     let addr = "0.0.0.0:60000".parse()?;
 
-    let nats_client = ConnectOptions::with_credentials_file(cfg.nats.creds.into()).await?
-        .require_tls(cfg.nats.tls.enabled)
-        .add_root_certificates(cfg.nats.tls.ca.into())
-        .add_client_certificate(
-            cfg.nats.tls.crt.into(),
-            cfg.nats.tls.key.into()
-        )
+    let mut nats_opts: ConnectOptions;
+
+    if cfg.nats.creds.is_none() {
+        nats_opts = ConnectOptions::new();
+    } else {
+        nats_opts = ConnectOptions::with_credentials_file(
+            cfg.nats.creds.unwrap_or_default().into()
+        ).await?;
+    }
+
+    if cfg.nats.tls.enabled {
+        nats_opts = nats_opts
+            .require_tls(true)
+            .add_root_certificates(cfg.nats.tls.ca.unwrap_or_default().into())
+            .add_client_certificate(
+                cfg.nats.tls.crt.unwrap_or_default().into(),
+                cfg.nats.tls.key.unwrap_or_default().into()
+            );
+    }
+
+    let nats_client = nats_opts
         .connect(cfg.nats.server_urls)
         .await?;
 
     tokio::spawn({
+        let cfg = nats_handler_config.to_owned();
         let client = nats_client.clone();
 
         async move {
-            subscribe(client, "cyverse.discoenv.analyses.get".into(), handle_analysis_request).await?;
-            Ok::<(), anyhow::Error>(())
+            let mut subscriber = client.subscribe("cyverse.discoenv.analyses.get".into()).await?;
+
+            while let Some(msg) = subscriber.next().await {
+                tokio::spawn({
+                    let cfg = cfg.clone();
+                    let pool = pool.clone();
+                    let client = client.clone();
+
+                    async move {
+                        let reply_subject = msg.reply.unwrap_or_default();
+                        
+                        let resp = match handle_analysis_request(&msg.payload, &pool, &cfg).await {
+                            Ok(v) => v,
+                            Err(e) => {
+                                let mut r = debuff::analysis::AnalysisRecordList::default();
+                                r.error = Some(e.into());
+                                r
+                            }
+
+                        };
+
+                        let msg_body = serde_json::to_string(&resp)?;
+                        client.publish(reply_subject, msg_body.into()).await?;
+                        
+                        Ok::<(), async_nats::Error>(())
+                    }
+                });
+            }
+
+            Ok::<(), async_nats::Error>(())
         }
     });
+
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
