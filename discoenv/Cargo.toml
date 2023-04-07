@@ -10,7 +10,7 @@ anyhow = "1.0.69"
 axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipart", "ws"] }
 axum-tracing-opentelemetry = { version = "0.10.0", features = ["jaeger", "tracing_subscriber_ext", "tracer", "otlp"] }
 clap = { version = "4.1.8", features = ["derive", "env"] }
-debuff = { git = "https://github.com/cyverse-de/p", rev="0d1f78f2d3703360f9c4e5a80ba826e9b219c2bc" }
+debuff = { git = "https://github.com/cyverse-de/p", rev="3fefb209bb05bfea5056f8ce42b550287afa1e5b" }
 opentelemetry = { version = "0.18.0", features = ["rt-tokio"] }
 pbjson-types = "0.5.1"
 serde = { version = "1.0.154", features = ["derive", "serde_derive"] }
@@ -27,6 +27,7 @@ utoipa = { version = "3.1.0", features = ["yaml", "axum_extras", "debug", "chron
 utoipa-swagger-ui = { version = "3.1.0", features = ["axum", "debug", "debug-embed"] }
 async-nats = { version = "0.29.0", features = ["service"] }
 futures = "0.3.28"
+prost = "0.11.8"
 
 [dependencies.uuid]
 version = "1.1.2"

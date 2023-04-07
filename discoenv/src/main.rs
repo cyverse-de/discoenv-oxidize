@@ -1,7 +1,9 @@
 use discoenv::errors::DiscoError;
 use discoenv::handlers::common;
 use discoenv::handlers::config;
+use discoenv::handlers::config::HandlerConfiguration;
 use futures::stream::StreamExt;
+use futures::future::{BoxFuture, FutureExt};
 use async_nats::ConnectOptions;
 use axum::{
     routing::get,
@@ -68,8 +70,62 @@ struct Config {
     nats: ConfigNATS, 
 }
 
+async fn nats_subscribe<M>(
+    client: &async_nats::Client, 
+    pool: Arc<PgPool>, 
+    subject: &str,
+    handler: fn(&[u8], &PgPool, &config::HandlerConfiguration) -> futures::future::BoxFuture<'static, Result<M, DiscoError>>,
+    cfg: &HandlerConfiguration
+) 
+-> tokio::task::JoinHandle<std::result::Result<(), Box<dyn std::error::Error + Send + Sync>>> 
+where
+    M: prost::Message + debuff::SetError + Default + Serialize + 'static,
+{
+    let subject = subject.to_owned();
+    tokio::spawn({
+        let cfg = cfg.clone();
+        let client = client.clone();
+
+        async move {
+            let subject = subject.clone();
+            let mut subscriber = client.subscribe(subject.into()).await?;
+
+            while let Some(msg) = subscriber.next().await {
+                tokio::spawn({
+                    let cfg = cfg.clone();
+                    let pool = pool.clone();
+                    let client = client.clone();
+
+                    async move {
+                        let reply_subject = msg.reply.unwrap_or_default();
+                        
+                        let resp = match handler(&msg.payload, &pool, &cfg).await {
+                            Ok(v) => v,
+                            Err(e) => {
+                                let mut r = M::default();
+                                r.set_error(e.into());
+                                r
+                            }
+
+                        };
+
+                        let msg_body = serde_json::to_string(&resp)?;
+                        client.publish(reply_subject, msg_body.into()).await?;
+                        
+                        Ok::<(), async_nats::Error>(())
+                    }
+                });
+            }
+
+            Ok::<(), async_nats::Error>(())
+        }
+    })
+}
+
 async fn handle_analysis_request(payload: &[u8], db: &PgPool, cfg: &config::HandlerConfiguration) -> Result<debuff::analysis::AnalysisRecordList, DiscoError> {
     let mut tx = db.begin().await?;
+
+    let mut resp = debuff::analysis::AnalysisRecordList::default();
 
     let req = serde_json::from_slice::<requests::ByUsername>(payload).map_err(|e| {
         DiscoError::UnmarshalFailure(e.to_string())
@@ -82,7 +138,6 @@ async fn handle_analysis_request(payload: &[u8], db: &PgPool, cfg: &config::Hand
     
     println!("after validate_username");
     let analyses = analyses::get_user_analyses(&mut tx, &user).await?;
-    let mut resp = debuff::analysis::AnalysisRecordList::default();
     resp.analyses = analyses;
 
     Ok(resp)
@@ -103,7 +158,7 @@ async fn main() -> Result<()> {
         user_domain: cfg.users.domain.clone(),
     };
 
-    let nats_handler_config = handler_config.clone();
+    let nats_handler_config = Arc::new(handler_config.clone());
 
     #[derive(OpenApi)]
     #[openapi(
@@ -237,53 +292,15 @@ async fn main() -> Result<()> {
             );
     }
 
-    let nats_client = nats_opts
+    let nats_client = Arc::new(nats_opts
         .connect(cfg.nats.server_urls)
-        .await?;
-
-    tokio::spawn({
-        let cfg = nats_handler_config.to_owned();
-        let client = nats_client.clone();
-
-        async move {
-            let mut subscriber = client.subscribe("cyverse.discoenv.analyses.get".into()).await?;
-
-            while let Some(msg) = subscriber.next().await {
-                tokio::spawn({
-                    let cfg = cfg.clone();
-                    let pool = pool.clone();
-                    let client = client.clone();
-
-                    async move {
-                        let reply_subject = msg.reply.unwrap_or_default();
-                        
-                        let resp = match handle_analysis_request(&msg.payload, &pool, &cfg).await {
-                            Ok(v) => v,
-                            Err(e) => {
-                                let mut r = debuff::analysis::AnalysisRecordList::default();
-                                r.error = Some(e.into());
-                                r
-                            }
-
-                        };
-
-                        let msg_body = serde_json::to_string(&resp)?;
-                        client.publish(reply_subject, msg_body.into()).await?;
-                        
-                        Ok::<(), async_nats::Error>(())
-                    }
-                });
-            }
-
-            Ok::<(), async_nats::Error>(())
-        }
-    });
+        .await?);
 
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+        .with_graceful_shutdown(shutdown_signal()).await?;
+
 
     Ok(())
 }
