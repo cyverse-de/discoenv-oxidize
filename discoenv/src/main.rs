@@ -1,17 +1,10 @@
-use discoenv::errors::DiscoError;
-use discoenv::handlers::common;
-use discoenv::handlers::config;
-use discoenv::handlers::config::HandlerConfiguration;
-use futures::stream::StreamExt;
-use futures::future::{BoxFuture, FutureExt};
-use async_nats::ConnectOptions;
 use axum::{
     routing::get,
     Router,
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use discoenv::db::{bags, preferences, searches, analyses};
+use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use sqlx::postgres::PgPool;
@@ -21,9 +14,7 @@ use anyhow::{Result, Context, anyhow};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
-use debuff::{self, requests};
 use std::sync::Arc;
-use std::future::Future;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -84,8 +75,6 @@ async fn main() -> Result<()> {
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
     };
-
-    let nats_handler_config = Arc::new(handler_config.clone());
 
     #[derive(OpenApi)]
     #[openapi(
@@ -198,30 +187,6 @@ async fn main() -> Result<()> {
         .with_state((pool.clone(), handler_config));
 
     let addr = "0.0.0.0:60000".parse()?;
-
-    let mut nats_opts: ConnectOptions;
-
-    if cfg.nats.creds.is_none() {
-        nats_opts = ConnectOptions::new();
-    } else {
-        nats_opts = ConnectOptions::with_credentials_file(
-            cfg.nats.creds.unwrap_or_default().into()
-        ).await?;
-    }
-
-    if cfg.nats.tls.enabled {
-        nats_opts = nats_opts
-            .require_tls(true)
-            .add_root_certificates(cfg.nats.tls.ca.unwrap_or_default().into())
-            .add_client_certificate(
-                cfg.nats.tls.crt.unwrap_or_default().into(),
-                cfg.nats.tls.key.unwrap_or_default().into()
-            );
-    }
-
-    let nats_client = Arc::new(nats_opts
-        .connect(cfg.nats.server_urls)
-        .await?);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
