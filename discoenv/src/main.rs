@@ -1,27 +1,27 @@
-use axum::body::Body;
 use axum::{
+    headers::{Authorization, authorization::Bearer},
+    http::{Request, StatusCode},
+    middleware::{Next, self},
     routing::get,
-    Router,
+    RequestPartsExt,
     response::Response,
-    http::Request,
+    Router,
+    TypedHeader,
 };
-use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
+//use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
-use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use sqlx::postgres::PgPool;
-use tower::{Service, Layer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use anyhow::{Result, Context, anyhow};
+use anyhow::{Result, Context};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
-use std::task::{self, Poll};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -61,45 +61,23 @@ struct Config {
     oauth: Option<ConfigOauth>,
 }
 
-#[derive(Clone)]
-struct AuthMiddleware<S> {
-    inner: S,
-}
-
-impl<S> Service<Request<Body>> for AuthMiddleware<S>
+async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, StatusCode>
 where
-    S: Service<Request<Body>, Response = Response> + Send + 'static,
-    S::Future: Send + 'static,
+    B: Send,
 {
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    let (mut parts, body) = request.into_parts();
 
-    fn poll_ready(&mut self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(ctx)
+    let bearer: TypedHeader<Authorization<Bearer>> = parts.extract()
+        .await
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    if bearer.token().is_empty() {
+        return Err(StatusCode::UNAUTHORIZED);
     }
 
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        let future = self.inner.call(request);
+    let request = Request::from_parts(parts, body);
 
-        Box::pin(async move {
-            let response: Response = future.await?;
-            Ok(response)
-        })
-    }
-}
-
-#[derive(Clone)]
-struct AuthLayer;
-
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthMiddleware<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        AuthMiddleware {
-            inner
-        }
-    }
+    Ok(next.run(request).await)
 }
 
 #[tokio::main]
@@ -159,8 +137,8 @@ async fn main() -> Result<()> {
     )]
 
     struct ApiDoc;
-    axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
-        .map_err(|e| anyhow!(format!("{:?}", e)))? ;
+    //axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
+    //   .map_err(|e| anyhow!(format!("{:?}", e)))? ;
 
     let pref_routes = Router::new()
         .route(
@@ -215,7 +193,8 @@ async fn main() -> Result<()> {
         .route(
             "/:username",
             get(handlers::analyses::get_user_analyses)
-        );
+        )
+        .layer(middleware::from_fn(auth_middleware));
 
 
     let mut swagger_ui = SwaggerUi::new("/docs")
@@ -245,8 +224,8 @@ async fn main() -> Result<()> {
         .nest("/sessions", sessions_routes)
         .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
-        .layer(response_with_trace_layer())
-        .layer(opentelemetry_tracing_layer())
+        //.layer(response_with_trace_layer())
+        //.layer(opentelemetry_tracing_layer())
         .with_state((pool.clone(), handler_config));
 
     let addr = "0.0.0.0:60000".parse()?;
