@@ -14,6 +14,7 @@ use anyhow::{Result, Context, anyhow};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
+use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
 
 #[derive(Parser)]
@@ -28,38 +29,30 @@ struct Cli {
     config: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct ConfigDB {
     uri: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct ConfigUsers {
     domain: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ConfigNatsTls{
-    enabled: bool,
-    crt: Option<String>,
-    key: Option<String>,
-    ca: Option<String>
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct ConfigOauth {
+    uri: String,
+    realm: String,
+    client_id: String,
+    client_secret: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ConfigNATS {
-    server_urls: String,
-    creds: Option<String>,
-    max_reconnects: Option<u32>,
-    reconnect_wait: Option<u32>,
-    tls: ConfigNatsTls
-}
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct Config {
     db: ConfigDB, 
     users: ConfigUsers,
-    nats: ConfigNATS, 
+    oauth: Option<ConfigOauth>,
 }
 
 #[tokio::main]
@@ -108,6 +101,10 @@ async fn main() -> Result<()> {
                 searches::SavedSearches,
                 errors::DiscoError,
             )
+        ),
+        security(
+            (),
+            ("open_id_connect" = [])
         ),
         tags(
             (name = "user-info", description="User information API")
@@ -173,9 +170,28 @@ async fn main() -> Result<()> {
             get(handlers::analyses::get_user_analyses)
         );
 
+
+    let mut swagger_ui = SwaggerUi::new("/docs")
+        .url("/openapi.json", ApiDoc::openapi());
+
+
+    if cfg.oauth.is_some() {
+        let o = cfg.oauth.unwrap_or_default();
+        swagger_ui = swagger_ui
+            .oauth(
+                oauth::Config::new()
+                    .client_id(&o.client_id)
+                    .client_secret(&o.client_secret)
+                    .realm(&o.realm)
+            )
+            .config(
+                utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
+            );
+    }
+
     let app = Router::new()
         .route("/", get(|| async {}))
-        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .merge(swagger_ui)
         .nest("/analyses", analyses_routes)
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
