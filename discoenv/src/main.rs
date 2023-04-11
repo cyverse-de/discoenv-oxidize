@@ -1,13 +1,18 @@
+use axum::body::Body;
 use axum::{
     routing::get,
     Router,
+    response::Response,
+    http::Request,
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use sqlx::postgres::PgPool;
+use tower::{Service, Layer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use anyhow::{Result, Context, anyhow};
@@ -16,6 +21,7 @@ use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
+use std::task::{self, Poll};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -53,6 +59,47 @@ struct Config {
     db: ConfigDB, 
     users: ConfigUsers,
     oauth: Option<ConfigOauth>,
+}
+
+#[derive(Clone)]
+struct AuthMiddleware<S> {
+    inner: S,
+}
+
+impl<S> Service<Request<Body>> for AuthMiddleware<S>
+where
+    S: Service<Request<Body>, Response = Response> + Send + 'static,
+    S::Future: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, ctx: &mut task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(ctx)
+    }
+
+    fn call(&mut self, request: Request<Body>) -> Self::Future {
+        let future = self.inner.call(request);
+
+        Box::pin(async move {
+            let response: Response = future.await?;
+            Ok(response)
+        })
+    }
+}
+
+#[derive(Clone)]
+struct AuthLayer;
+
+impl<S> Layer<S> for AuthLayer {
+    type Service = AuthMiddleware<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        AuthMiddleware {
+            inner
+        }
+    }
 }
 
 #[tokio::main]
