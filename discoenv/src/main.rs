@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use axum::{
     headers::{Authorization, authorization::Bearer},
     http::{Request, StatusCode},
@@ -8,11 +9,10 @@ use axum::{
     Router,
     TypedHeader,
 };
-//use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
+use axum_tracing_opentelemetry::opentelemetry_tracing_layer;
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -84,8 +84,8 @@ where
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
-    let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
+    let cfg_file = std::fs::File::open(&cli.config).expect("could not open configuration file");
+    let cfg: Config = serde_yaml::from_reader(cfg_file).expect("could not read values from configuration file");
 
     let pool = Arc::new(PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?);
 
@@ -137,34 +137,34 @@ async fn main() -> Result<()> {
     )]
 
     struct ApiDoc;
-    //axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
-    //   .map_err(|e| anyhow!(format!("{:?}", e)))? ;
+    axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
+       .map_err(|e| anyhow!(format!("{:?}", e)))? ;
 
     let pref_routes = Router::new()
         .route(
             "/:username",
             get(handlers::preferences::get_user_preferences)
-            .put(handlers::preferences::add_user_preferences)
-            .post(handlers::preferences::update_user_preferences)
-            .delete(handlers::preferences::delete_user_preferences)
+                .put(handlers::preferences::add_user_preferences)
+                .post(handlers::preferences::update_user_preferences)
+                .delete(handlers::preferences::delete_user_preferences)
         );
 
     let searches_routes = Router::new()
         .route(
             "/:username",
             get(handlers::searches::get_saved_searches)
-            .put(handlers::searches::add_saved_searches)
-            .post(handlers::searches::update_saved_searches)
-            .delete(handlers::searches::delete_saved_searches)
+                .put(handlers::searches::add_saved_searches)
+                .post(handlers::searches::update_saved_searches)
+                .delete(handlers::searches::delete_saved_searches)
         );
 
     let sessions_routes = Router::new()
         .route(
             "/:username",
             get(handlers::sessions::get_user_sessions)
-            .put(handlers::sessions::add_user_sessions)
-            .post(handlers::sessions::update_user_sessions)
-            .delete(handlers::sessions::delete_user_sessions)
+                .put(handlers::sessions::add_user_sessions)
+                .post(handlers::sessions::update_user_sessions)
+                .delete(handlers::sessions::delete_user_sessions)
         );
 
     let bag_routes = Router::new()
@@ -225,7 +225,7 @@ async fn main() -> Result<()> {
         .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
         //.layer(response_with_trace_layer())
-        //.layer(opentelemetry_tracing_layer())
+        .layer(opentelemetry_tracing_layer())
         .with_state((pool.clone(), handler_config));
 
     let addr = "0.0.0.0:60000".parse()?;
