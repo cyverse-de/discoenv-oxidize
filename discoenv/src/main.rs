@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use axum::{
+    extract::State,
     headers::{Authorization, authorization::Bearer},
     http::{Request, StatusCode},
     middleware::{Next, self},
@@ -63,18 +64,32 @@ struct Config {
     oauth: Option<ConfigOauth>,
 }
 
-async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, StatusCode>
+async fn auth_middleware<B>(
+    State(authz_opt): State<Option<auth::Authenticator>>, 
+    request: Request<B>, 
+    next: Next<B>
+) -> Result<Response, StatusCode>
 where
     B: Send,
 {
     let (mut parts, body) = request.into_parts();
 
-    let bearer: TypedHeader<Authorization<Bearer>> = parts.extract()
-        .await
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if let Some(authz) = authz_opt {
+        let bearer: TypedHeader<Authorization<Bearer>> = parts.extract()
+            .await
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    if bearer.token().is_empty() {
-        return Err(StatusCode::UNAUTHORIZED);
+        if bearer.token().is_empty() {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+
+        let is_okay = authz.validate_token(bearer.token())
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        
+        if !is_okay {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     }
 
     let request = Request::from_parts(parts, body);
@@ -103,6 +118,30 @@ async fn main() -> Result<()> {
         auth: None,
     };
     
+    let mut swagger_ui = SwaggerUi::new("/docs")
+        .url("/openapi.json", ApiDoc::openapi());
+
+
+    if cfg.oauth.is_some() {
+        let o = cfg.oauth.unwrap_or_default();
+        swagger_ui = swagger_ui
+            .oauth(
+                oauth::Config::new()
+                    .client_id(&o.client_id)
+                    .client_secret(&o.client_secret)
+                    .realm(&o.realm)
+            )
+            .config(
+                utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
+            );
+        state.auth = Some(auth::Authenticator::setup(
+            &o.uri,
+            &o.realm,
+            &o.client_id,
+            &o.client_secret,
+        )?);
+    }
+
     #[derive(OpenApi)]
     #[openapi(
         paths(
@@ -203,32 +242,7 @@ async fn main() -> Result<()> {
             "/:username",
             get(handlers::analyses::get_user_analyses)
         )
-        .layer(middleware::from_fn(auth_middleware));
-
-
-    let mut swagger_ui = SwaggerUi::new("/docs")
-        .url("/openapi.json", ApiDoc::openapi());
-
-
-    if cfg.oauth.is_some() {
-        let o = cfg.oauth.unwrap_or_default();
-        swagger_ui = swagger_ui
-            .oauth(
-                oauth::Config::new()
-                    .client_id(&o.client_id)
-                    .client_secret(&o.client_secret)
-                    .realm(&o.realm)
-            )
-            .config(
-                utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
-            );
-        state.auth = Some(auth::Authenticator::setup(
-            &o.uri,
-            &o.realm,
-            &o.client_id,
-            &o.client_secret,
-        )?);
-    }
+        .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
 
     let app = Router::new()
         .route("/", get(|| async {}))
