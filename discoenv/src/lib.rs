@@ -7,6 +7,7 @@ pub mod handlers {
     pub mod preferences;
     pub mod searches;
     pub mod sessions;
+    pub mod tokens;
 }
 
 pub mod db {

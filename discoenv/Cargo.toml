@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.69"
 axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipart", "ws"] }
+axum-auth = { version = "0.4", default-features = false, features = ["auth-basic"] }
 axum-tracing-opentelemetry = { version = "0.10.0", features = ["jaeger", "tracing_subscriber_ext", "tracer", "otlp"] }
 clap = { version = "4.1.8", features = ["derive", "env"] }
 debuff = { git = "https://github.com/cyverse-de/p", rev="3fefb209bb05bfea5056f8ce42b550287afa1e5b" }

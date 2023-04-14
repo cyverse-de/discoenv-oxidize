@@ -253,6 +253,7 @@ async fn main() -> Result<()> {
         .nest("/sessions", sessions_routes)
         .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
+        .route("/token", get(handlers::tokens::get_token))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
         .with_state(state);
