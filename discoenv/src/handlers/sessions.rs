@@ -14,7 +14,8 @@ use super::common;
 use super::config;
 
 pub async fn get_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Session>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -28,7 +29,8 @@ pub async fn get_user_sessions(
 }
 
 pub async fn add_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,
     Path(username): Path<String>,
     Json(sessions): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
@@ -52,7 +54,8 @@ pub async fn add_user_sessions(
 }
 
 pub async fn update_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,
     Path(username): Path<String>,
     Json(sessions): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Session>, DiscoError> {
@@ -76,7 +79,8 @@ pub async fn update_user_sessions(
 }
 
 pub async fn delete_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);

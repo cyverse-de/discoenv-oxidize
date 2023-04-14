@@ -34,10 +34,11 @@ use super::config;
     tag = "analyses"
 )]
 pub async fn get_user_analyses(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(pool): State<Arc<PgPool>>,
+    State(handler_config): State<config::HandlerConfiguration>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Vec<analysis::Analysis>>, DiscoError> {
-    let mut tx = conn.begin().await?;
-    let user = common::validate_username(&mut tx, &username, &cfg).await?;
+    let mut tx = pool.begin().await?;
+    let user = common::validate_username(&mut tx, &username, &handler_config).await?;
     Ok(Json(analyses::get_user_analyses(&mut tx, &user).await?))
 }

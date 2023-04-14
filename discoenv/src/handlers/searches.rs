@@ -38,7 +38,8 @@ use super::config;
     tag = "searches"
 )]
 pub async fn get_saved_searches(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -74,7 +75,8 @@ pub async fn get_saved_searches(
     tag = "searches"
 )]
 pub async fn has_saved_searches(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -111,7 +113,8 @@ pub async fn has_saved_searches(
     tag = "searches"
 )]
 pub async fn add_saved_searches(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
@@ -152,7 +155,8 @@ pub async fn add_saved_searches(
     tag = "searches"
 )]
 pub async fn update_saved_searches(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
@@ -193,7 +197,8 @@ pub async fn update_saved_searches(
     tag = "searches"
 )]
 pub async fn delete_saved_searches(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);

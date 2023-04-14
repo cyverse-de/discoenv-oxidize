@@ -18,6 +18,7 @@ pub mod db {
     pub mod users;
 }
 
+pub mod app_state;
 pub mod auth;
 pub mod errors;
 pub mod signals;

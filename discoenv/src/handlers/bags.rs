@@ -43,7 +43,8 @@ use super::common;
     tag = "bag"
 )]
 pub async fn get_user_bags(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,   // Extracts the pool from the state.
     Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
 ) -> response::Result<Json<Bags>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -80,8 +81,9 @@ pub async fn get_user_bags(
     tag = "bag"
 )]
 pub async fn delete_user_bags(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
     Path(username): Path<String>,
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,   // Extracts the pool from the state.
 ) -> response::Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);
     let mut tx = conn.begin().await?;
@@ -122,7 +124,8 @@ pub async fn delete_user_bags(
     tag = "bag"
 )]
 pub  async fn add_user_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
@@ -164,7 +167,8 @@ pub  async fn add_user_bag(
     tag = "bag"
 )]
 pub async fn user_has_bags(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -198,7 +202,8 @@ pub async fn user_has_bags(
     tag = "bag"
 )]
 pub async fn get_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -236,7 +241,8 @@ pub async fn get_bag(
     tag = "bag"
 )]
 pub async fn update_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path((username, bag_id)): Path<(String, Uuid)>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
@@ -280,7 +286,8 @@ pub async fn update_bag(
     tag = "bag"
 )]
 pub async fn delete_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path((username, bag_id)): Path<(String, Uuid)>,
 ) -> response::Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -318,7 +325,8 @@ pub async fn delete_bag(
     tag = "bag"
 )]
 pub async fn get_default_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> response::Result<Json<Bag>, DiscoError> {
     let user = common::fix_username(&username, &cfg);
@@ -361,7 +369,8 @@ pub async fn get_default_bag(
     tag = "bag"
 )]
 pub async fn update_default_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
@@ -405,7 +414,8 @@ pub async fn update_default_bag(
     tag = "bag"
 )]
 pub async fn delete_default_bag(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,   // Extracts the pool from the state.
+    State(conn): State<Arc<PgPool>>,
+    State(cfg): State<config::HandlerConfiguration>,    
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
     let user = common::fix_username(&username, &cfg);

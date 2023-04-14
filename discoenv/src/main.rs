@@ -9,7 +9,7 @@ use axum::{
     Router,
     TypedHeader,
 };
-use axum_tracing_opentelemetry::opentelemetry_tracing_layer;
+use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
@@ -17,6 +17,8 @@ use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use anyhow::{Result, Context};
+use discoenv::app_state::DiscoenvState;
+use discoenv::auth;
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
@@ -92,8 +94,15 @@ async fn main() -> Result<()> {
     let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
+        do_auth: cfg.oauth.is_some(),
     };
 
+    let mut state = DiscoenvState {
+        pool,
+        handler_config,
+        auth: None,
+    };
+    
     #[derive(OpenApi)]
     #[openapi(
         paths(
@@ -213,6 +222,12 @@ async fn main() -> Result<()> {
             .config(
                 utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
             );
+        state.auth = Some(auth::Authenticator::setup(
+            &o.uri,
+            &o.realm,
+            &o.client_id,
+            &o.client_secret,
+        )?);
     }
 
     let app = Router::new()
@@ -224,9 +239,9 @@ async fn main() -> Result<()> {
         .nest("/sessions", sessions_routes)
         .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
-        //.layer(response_with_trace_layer())
+        .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
-        .with_state((pool.clone(), handler_config));
+        .with_state(state);
 
     let addr = "0.0.0.0:60000".parse()?;
 
