@@ -29,6 +29,7 @@ async-nats = { version = "0.29.0", features = ["service"] }
 futures = "0.3.28"
 prost = "0.11.8"
 reqwest = { version = "0.11.16", features = ["json", "blocking", "rustls", "tokio-rustls", "rustls-tls"] }
+url = { version = "2.3.1", features = ["serde"] }
 
 [dependencies.uuid]
 version = "1.1.2"

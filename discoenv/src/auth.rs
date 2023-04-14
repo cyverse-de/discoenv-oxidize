@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use url::{ParseError, Url};
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Token {
@@ -90,7 +91,7 @@ pub struct OIDCToken {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OIDCTokenRequest {
+struct OIDCTokenRequest {
     grant_type: String,
     client_id: String,
     client_secret: String,
@@ -109,7 +110,7 @@ pub struct OIDCImpersonationTokenRequest {
 }
 
 impl OIDCImpersonationTokenRequest {
-    fn new(client_id: &str, client_secret: &str, subject_token: &str, subject: &str) -> Self {
+    pub fn new(client_id: &str, client_secret: &str, subject_token: &str, subject: &str) -> Self {
         OIDCImpersonationTokenRequest {
             grant_type: "urn:ietf:params:oauth:grant-type:token-exchange".into(),
             client_id: client_id.into(),
@@ -129,7 +130,7 @@ pub struct TokenIntrospectionRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct TokenIntrospectionResult {
+struct TokenIntrospectionResult {
     active: bool,
     exp: Option<u64>,
     iat: Option<u64>,
@@ -162,7 +163,69 @@ fn is_service_account(username: &str) -> bool {
     username.starts_with("service-account-")
 }
 
-pub fn token_is_valid(unparsed_token: &str) -> Result<bool, anyhow::Error> {
-    //
-    Ok(true)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Authenticator {
+    base_url: Url,
+    introspection_url: Url,
+    token_url: Url,
+    client_id: String,
+    client_secret: String,
+}
+
+impl Authenticator {
+    pub fn setup(
+        base: &str,
+        realm: &str,
+        client_id: &str,
+        client_secret: &str,
+    ) -> Result<Self, ParseError> {
+        let base_url = Url::parse(base)?.join(&format!("realms/{}", realm))?;
+        let token_url = base_url.join("/protocol/openid-connect/token")?;
+        let introspection_url = token_url.join("/introspect")?;
+        Ok(Authenticator {
+            base_url,
+            token_url,
+            introspection_url,
+            client_id: client_id.into(),
+            client_secret: client_secret.into(),
+        })
+    }
+
+    pub async fn validate_token(&self, token: &str) -> Result<bool, reqwest::Error> {
+        let client = reqwest::Client::new();
+        let response = client
+            .post(self.introspection_url.as_str())
+            .form(&TokenIntrospectionRequest {
+                token: token.into(),
+                client_id: self.client_id.clone(),
+                client_secret: self.client_secret.clone(),
+            })
+            .send()
+            .await?
+            .json::<TokenIntrospectionResult>()
+            .await?;
+        Ok(response.active)
+    }
+
+    pub async fn get_token(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<OIDCToken, reqwest::Error> {
+        let client = reqwest::Client::new();
+        let token = client
+            .get(self.token_url.as_str())
+            .json(&OIDCTokenRequest {
+                client_id: self.client_id.clone(),
+                client_secret: self.client_secret.clone(),
+                username: username.into(),
+                password: password.into(),
+                grant_type: "password".into(),
+            })
+            .send()
+            .await?
+            .json::<OIDCToken>()
+            .await?;
+        Ok(token)
+    }
 }
