@@ -11,7 +11,7 @@ axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipar
 axum-auth = { version = "0.4", default-features = false, features = ["auth-basic"] }
 axum-tracing-opentelemetry = { version = "0.10.0", features = ["jaeger", "tracing_subscriber_ext", "tracer", "otlp"] }
 clap = { version = "4.1.8", features = ["derive", "env"] }
-debuff = { git = "https://github.com/cyverse-de/p", rev="3fefb209bb05bfea5056f8ce42b550287afa1e5b" }
+debuff = { git = "https://github.com/cyverse-de/p", rev="621d538d8e569d3e9d73716c7487aed760db075a" }
 opentelemetry = { version = "0.18.0", features = ["rt-tokio"] }
 pbjson-types = "0.5.1"
 serde = { version = "1.0.154", features = ["derive", "serde_derive"] }

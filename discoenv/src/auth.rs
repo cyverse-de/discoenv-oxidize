@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use url::{ParseError, Url};
 
+use crate::errors::DiscoError;
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Token {
     jwt_claims: JWTClaims,
@@ -85,6 +87,8 @@ pub struct OIDCCert {
 pub struct OIDCToken {
     access_token: String,
     token_type: String,
+
+    #[serde(rename = "not-before-policy")]
     not_before_policy: u64,
     session_state: String,
     scope: String,
@@ -179,9 +183,28 @@ impl Authenticator {
         client_id: &str,
         client_secret: &str,
     ) -> Result<Self, ParseError> {
-        let base_url = Url::parse(base)?.join(&format!("realms/{}", realm))?;
-        let token_url = base_url.join("/protocol/openid-connect/token")?;
-        let introspection_url = token_url.join("/introspect")?;
+        let b = Url::parse(base)?;
+        let mut base_url = b;
+        base_url
+            .path_segments_mut()
+            .map_err(|_| ParseError::SetHostOnCannotBeABaseUrl)?
+            .push("realms")
+            .push(realm);
+
+        let mut token_url = base_url.clone();
+        token_url
+            .path_segments_mut()
+            .map_err(|_| ParseError::SetHostOnCannotBeABaseUrl)?
+            .push("protocol")
+            .push("openid-connect")
+            .push("token");
+
+        let mut introspection_url = token_url.clone();
+        introspection_url
+            .path_segments_mut()
+            .map_err(|_| ParseError::SetHostOnCannotBeABaseUrl)?
+            .push("introspect");
+
         Ok(Authenticator {
             base_url,
             token_url,
@@ -189,6 +212,10 @@ impl Authenticator {
             client_id: client_id.into(),
             client_secret: client_secret.into(),
         })
+    }
+
+    pub fn token_url(&self) -> String {
+        self.token_url.to_string()
     }
 
     pub async fn validate_token(&self, token: &str) -> Result<bool, reqwest::Error> {
@@ -207,15 +234,11 @@ impl Authenticator {
         Ok(response.active)
     }
 
-    pub async fn get_token(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<OIDCToken, reqwest::Error> {
+    pub async fn get_token(&self, username: &str, password: &str) -> Result<OIDCToken, DiscoError> {
         let client = reqwest::Client::new();
-        let token = client
-            .get(self.token_url.as_str())
-            .json(&OIDCTokenRequest {
+        let resp = client
+            .post(self.token_url.as_str())
+            .form(&OIDCTokenRequest {
                 client_id: self.client_id.clone(),
                 client_secret: self.client_secret.clone(),
                 username: username.into(),
@@ -224,8 +247,9 @@ impl Authenticator {
             })
             .send()
             .await?
+            .error_for_status()?
             .json::<OIDCToken>()
             .await?;
-        Ok(token)
+        Ok(resp)
     }
 }
