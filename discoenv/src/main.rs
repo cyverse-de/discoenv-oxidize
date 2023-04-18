@@ -74,8 +74,12 @@ where
 {
     let (mut parts, body) = request.into_parts();
 
+    let mut req: Request<B>;
+    let mut user_info: auth::UserInfo;
+    
     if let Some(authz) = authz_opt {
-        let bearer: TypedHeader<Authorization<Bearer>> = parts.extract()
+        let bearer: TypedHeader<Authorization<Bearer>> = parts
+            .extract()
             .await
             .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
@@ -83,17 +87,22 @@ where
             return Err(StatusCode::UNAUTHORIZED);
         }
        
-        let is_okay = authz.validate_token(bearer.token())
+        user_info = authz
+            .validate_token(bearer.token())
             .await?;
-      
-        if !is_okay {
+
+        if !user_info.active {
             return Err(StatusCode::UNAUTHORIZED);
         }
+        
+    } else {
+        user_info = auth::UserInfo::default();
     }
 
-    let request = Request::from_parts(parts, body);
+    req = Request::from_parts(parts, body);
+    req.extensions_mut().insert(user_info);
 
-    Ok(next.run(request).await)
+    Ok(next.run(req).await)
 }
 
 #[tokio::main]

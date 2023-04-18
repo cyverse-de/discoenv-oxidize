@@ -5,86 +5,6 @@ use crate::errors::DiscoError;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Token {
-    jwt_claims: JWTClaims,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct JWTClaims {
-    uid_domain: String,
-    preferred_username: String,
-    email: String,
-    given_name: String,
-    family_name: String,
-    name: String,
-    entitlement: Vec<String>,
-    realm_access: Vec<String>,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct User {
-    uid_domain: String,
-    short_username: String,
-    username: String,
-    email: String,
-    first_name: String,
-    last_name: String,
-    common_name: String,
-    entitlement: Vec<String>,
-}
-
-impl User {
-    pub fn is_service_account(&self) -> bool {
-        is_service_account(&self.short_username)
-    }
-}
-
-impl From<JWTClaims> for User {
-    fn from(claim: JWTClaims) -> Self {
-        let username = format!("{}@{d}", claim.preferred_username, d = claim.uid_domain);
-        User {
-            uid_domain: claim.uid_domain,
-            short_username: claim.preferred_username,
-            username,
-            email: claim.email,
-            first_name: claim.given_name,
-            last_name: claim.family_name,
-            common_name: claim.name,
-            entitlement: claim.entitlement,
-        }
-    }
-}
-
-impl JWTClaims {
-    pub fn is_service_account(&self) -> bool {
-        is_service_account(&self.preferred_username)
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OIDCKey {
-    kid: String,
-    kty: String,
-    alg: String,
-
-    #[serde(rename = "use")]
-    why: String,
-
-    n: String,
-    e: String,
-    x5c: Vec<String>,
-    x5t: String,
-
-    #[serde(rename = "x5t#S256")]
-    x5t_s256: String,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OIDCCert {
-    keys: Vec<OIDCKey>,
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OIDCToken {
     access_token: String,
     token_type: String,
 
@@ -95,7 +15,7 @@ pub struct OIDCToken {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-struct OIDCTokenRequest {
+struct TokenRequest {
     grant_type: String,
     client_id: String,
     client_secret: String,
@@ -104,30 +24,7 @@ struct OIDCTokenRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct OIDCImpersonationTokenRequest {
-    grant_type: String,
-    client_id: String,
-    client_secret: String,
-    subject_token: String,
-    requested_token_type: String,
-    requested_subject: String,
-}
-
-impl OIDCImpersonationTokenRequest {
-    pub fn new(client_id: &str, client_secret: &str, subject_token: &str, subject: &str) -> Self {
-        OIDCImpersonationTokenRequest {
-            grant_type: "urn:ietf:params:oauth:grant-type:token-exchange".into(),
-            client_id: client_id.into(),
-            client_secret: client_secret.into(),
-            subject_token: subject_token.into(),
-            requested_token_type: "urn:ietf:params:oauth:token-type:access_token".into(),
-            requested_subject: subject.into(),
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct TokenIntrospectionRequest {
+struct TokenIntrospectionRequest {
     token: String,
     client_id: String,
     client_secret: String,
@@ -173,23 +70,41 @@ struct TokenIntrospectionResult {
 
     realm_access: Option<RealmAccess>,
     resource_access: Option<ResourceAccess>,
-
-    // #[serde(rename = "DOB")]
-    // dob: Option<String>,
-    // organization: Option<String>,
     client_id: Option<String>,
-    // client_subject: Option<String>,
-    // username: Option<String>,
+    entitlement: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ServiceAccountInfo {
-    username: String,
-    roles: Vec<String>,
+pub struct UserInfo {
+    pub active: bool,
+    pub preferred_username: Option<String>,
+    pub email_verified: Option<bool>,
+    pub scope: Option<String>,
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub realm_access: Option<RealmAccess>,
+    pub resource_access: Option<ResourceAccess>,
+    pub entitlement: Option<Vec<String>>,
 }
 
-fn is_service_account(username: &str) -> bool {
-    username.starts_with("service-account-")
+impl From<TokenIntrospectionResult> for UserInfo {
+    fn from(from: TokenIntrospectionResult) -> Self {
+        UserInfo {
+            active: from.active,
+            preferred_username: from.preferred_username,
+            email_verified: from.email_verified,
+            scope: from.scope,
+            email: from.email,
+            name: from.name,
+            given_name: from.given_name,
+            family_name: from.family_name,
+            realm_access: from.realm_access,
+            resource_access: from.resource_access,
+            entitlement: from.entitlement,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -243,7 +158,7 @@ impl Authenticator {
         self.token_url.to_string()
     }
 
-    pub async fn validate_token(&self, token: &str) -> Result<bool, DiscoError> {
+    pub async fn validate_token(&self, token: &str) -> Result<UserInfo, DiscoError> {
         let client = reqwest::Client::new();
         let result = client
             .post(self.introspection_url.as_str())
@@ -258,14 +173,14 @@ impl Authenticator {
             .json::<TokenIntrospectionResult>()
             .await?;
 
-        Ok(result.active)
+        Ok(result.into())
     }
 
-    pub async fn get_token(&self, username: &str, password: &str) -> Result<OIDCToken, DiscoError> {
+    pub async fn get_token(&self, username: &str, password: &str) -> Result<Token, DiscoError> {
         let client = reqwest::Client::new();
         let resp = client
             .post(self.token_url.as_str())
-            .form(&OIDCTokenRequest {
+            .form(&TokenRequest {
                 client_id: self.client_id.clone(),
                 client_secret: self.client_secret.clone(),
                 username: username.into(),
@@ -275,7 +190,7 @@ impl Authenticator {
             .send()
             .await?
             .error_for_status()?
-            .json::<OIDCToken>()
+            .json::<Token>()
             .await?;
         Ok(resp)
     }
