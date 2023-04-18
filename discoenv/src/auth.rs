@@ -94,6 +94,12 @@ pub struct UserInfo {
 }
 impl CanExpire for UserInfo {
     fn is_expired(&self) -> bool {
+        // Don't cache inactive token introspection results.
+        // Could result in users being unable to authenticate for a day after a failure.
+        if !self.active {
+            return true;
+        }
+
         // If both fields are None, then the response is uncacheable.
         if self.iat.is_none() && self.exp.is_none() {
             return true;
