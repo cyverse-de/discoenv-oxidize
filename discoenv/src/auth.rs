@@ -244,12 +244,8 @@ impl Authenticator {
     }
 
     pub async fn validate_token(&self, token: &str) -> Result<bool, DiscoError> {
-        println!("in validate_token");
-        println!("client_id: {}", self.client_id);
-        println!("client_secret: {}", self.client_secret);
-        println!("introspection URL: {}", self.introspection_url.as_str());
         let client = reqwest::Client::new();
-        let response = client
+        let result = client
             .post(self.introspection_url.as_str())
             .form(&TokenIntrospectionRequest {
                 token: token.into(),
@@ -257,18 +253,11 @@ impl Authenticator {
                 client_secret: self.client_secret.clone(),
             })
             .send()
+            .await?
+            .error_for_status()?
+            .json::<TokenIntrospectionResult>()
             .await?;
 
-        println!("unparsed resp: {:?}", response);
-
-        let r = response.error_for_status()?;
-        let b = r.text().await?;
-        println!("body: {}", b);
-        let result: TokenIntrospectionResult =
-            serde_json::from_str(&b).map_err(|_| DiscoError::UnmarshalFailure("wtf".into()))?;
-        // .json::<TokenIntrospectionResult>()
-        // .await?;
-        println!("response: {:?}", result);
         Ok(result.active)
     }
 
