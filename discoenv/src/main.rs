@@ -75,7 +75,7 @@ where
     let (mut parts, body) = request.into_parts();
 
     let mut req: Request<B>;
-    let mut user_info: auth::UserInfo;
+    let user_info: auth::UserInfo;
     
     if let Some(authz) = authz_opt {
         let bearer: TypedHeader<Authorization<Bearer>> = parts

@@ -1,4 +1,6 @@
+use cached::{proc_macro::cached, stores::CanExpire};
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 use url::{ParseError, Url};
 
 use crate::errors::DiscoError;
@@ -48,8 +50,8 @@ pub struct ResourceAccess {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TokenIntrospectionResult {
     active: bool,
-    exp: Option<u64>,
-    iat: Option<u64>,
+    exp: Option<u64>, // should be seconds since the epoch. when the token expires.
+    iat: Option<u64>, // should be seconds since the epoch. when the token was granted.
     jti: Option<String>,
     iss: Option<String>,
     sub: Option<String>,
@@ -76,6 +78,8 @@ struct TokenIntrospectionResult {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
+    iat: Option<u64>,
+    exp: Option<u64>,
     pub active: bool,
     pub preferred_username: Option<String>,
     pub email_verified: Option<bool>,
@@ -88,10 +92,50 @@ pub struct UserInfo {
     pub resource_access: Option<ResourceAccess>,
     pub entitlement: Option<Vec<String>>,
 }
+impl CanExpire for UserInfo {
+    fn is_expired(&self) -> bool {
+        // If both fields are None, then the response is uncacheable.
+        if self.iat.is_none() && self.exp.is_none() {
+            return true;
+        }
+
+        let n = SystemTime::now().duration_since(UNIX_EPOCH);
+        if n.is_err() {
+            return true;
+        }
+
+        let now_seconds = n.unwrap_or_default().as_secs(); // unwrap or 0;
+
+        // now_seconds is 0, then something has gone wrong and the result isn't cacheable.
+        if now_seconds == 0 {
+            return true;
+        }
+
+        // Make sure the expiration date hasn't passed.
+        if let Some(expiration) = self.exp {
+            if now_seconds == 0 || (now_seconds >= expiration) {
+                return true;
+            }
+        }
+
+        // Make sure the token isn't more than a day old.
+        if let Some(creation) = self.iat {
+            if now_seconds >= (creation + 86_400) {
+                return true;
+            }
+        }
+
+        // If the call gets here, then the token isn't older than a day and hasn't expired.
+        // It can be cached.
+        return false;
+    }
+}
 
 impl From<TokenIntrospectionResult> for UserInfo {
     fn from(from: TokenIntrospectionResult) -> Self {
         UserInfo {
+            iat: from.iat,
+            exp: from.exp,
             active: from.active,
             preferred_username: from.preferred_username,
             email_verified: from.email_verified,
@@ -105,6 +149,29 @@ impl From<TokenIntrospectionResult> for UserInfo {
             entitlement: from.entitlement,
         }
     }
+}
+
+#[cached(result = true, sync_writes = true)]
+async fn check_token(
+    url: String,
+    token: String,
+    client_id: String,
+    client_secret: String,
+) -> Result<TokenIntrospectionResult, reqwest::Error> {
+    let client = reqwest::Client::new();
+    let result = client
+        .post(url)
+        .form(&TokenIntrospectionRequest {
+            token,
+            client_id,
+            client_secret,
+        })
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<TokenIntrospectionResult>()
+        .await?;
+    Ok(result)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -159,21 +226,14 @@ impl Authenticator {
     }
 
     pub async fn validate_token(&self, token: &str) -> Result<UserInfo, DiscoError> {
-        let client = reqwest::Client::new();
-        let result = client
-            .post(self.introspection_url.as_str())
-            .form(&TokenIntrospectionRequest {
-                token: token.into(),
-                client_id: self.client_id.clone(),
-                client_secret: self.client_secret.clone(),
-            })
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<TokenIntrospectionResult>()
-            .await?;
-
-        Ok(result.into())
+        Ok(check_token(
+            self.introspection_url.to_string(),
+            token.to_string(),
+            self.client_id.to_string(),
+            self.client_secret.to_string(),
+        )
+        .await?
+        .into())
     }
 
     pub async fn get_token(&self, username: &str, password: &str) -> Result<Token, DiscoError> {

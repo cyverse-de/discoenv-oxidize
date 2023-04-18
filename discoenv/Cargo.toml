@@ -31,6 +31,8 @@ futures = "0.3.28"
 prost = "0.11.8"
 reqwest = { version = "0.11.16", features = ["json", "blocking", "rustls", "tokio-rustls", "rustls-tls"] }
 url = { version = "2.3.1", features = ["serde"] }
+cached = { version = "0.43.0", features = ["serde", "serde_json"] }
+chrono = { version = "0.4.24", features = ["serde"] }
 
 [dependencies.uuid]
 version = "1.1.2"
