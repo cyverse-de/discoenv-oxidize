@@ -82,11 +82,10 @@ where
         if bearer.token().is_empty() {
             return Err(StatusCode::UNAUTHORIZED);
         }
-
+       
         let is_okay = authz.validate_token(bearer.token())
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        
+            .await?;
+      
         if !is_okay {
             return Err(StatusCode::UNAUTHORIZED);
         }

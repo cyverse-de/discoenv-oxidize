@@ -134,12 +134,27 @@ pub struct TokenIntrospectionRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct RealmAccess {
+    roles: Option<Vec<String>>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Account {
+    roles: Option<Vec<String>>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct ResourceAccess {
+    account: Option<Account>,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 struct TokenIntrospectionResult {
     active: bool,
     exp: Option<u64>,
     iat: Option<u64>,
-    jti: Option<u64>,
-    iss: Option<u64>,
+    jti: Option<String>,
+    iss: Option<String>,
     sub: Option<String>,
     typ: Option<String>,
     azp: Option<String>,
@@ -148,13 +163,23 @@ struct TokenIntrospectionResult {
     email_verified: Option<bool>,
     acr: Option<String>,
     scope: Option<String>,
+    email: Option<String>,
+    name: Option<String>,
+    given_name: Option<String>,
+    family_name: Option<String>,
 
-    #[serde(rename = "DOB")]
-    dob: Option<String>,
-    organization: Option<String>,
+    #[serde(rename = "allowed-origins")]
+    allowed_origins: Option<Vec<String>>,
+
+    realm_access: Option<RealmAccess>,
+    resource_access: Option<ResourceAccess>,
+
+    // #[serde(rename = "DOB")]
+    // dob: Option<String>,
+    // organization: Option<String>,
     client_id: Option<String>,
-    client_subject: Option<String>,
-    username: Option<String>,
+    // client_subject: Option<String>,
+    // username: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -218,7 +243,11 @@ impl Authenticator {
         self.token_url.to_string()
     }
 
-    pub async fn validate_token(&self, token: &str) -> Result<bool, reqwest::Error> {
+    pub async fn validate_token(&self, token: &str) -> Result<bool, DiscoError> {
+        println!("in validate_token");
+        println!("client_id: {}", self.client_id);
+        println!("client_secret: {}", self.client_secret);
+        println!("introspection URL: {}", self.introspection_url.as_str());
         let client = reqwest::Client::new();
         let response = client
             .post(self.introspection_url.as_str())
@@ -228,10 +257,19 @@ impl Authenticator {
                 client_secret: self.client_secret.clone(),
             })
             .send()
-            .await?
-            .json::<TokenIntrospectionResult>()
             .await?;
-        Ok(response.active)
+
+        println!("unparsed resp: {:?}", response);
+
+        let r = response.error_for_status()?;
+        let b = r.text().await?;
+        println!("body: {}", b);
+        let result: TokenIntrospectionResult =
+            serde_json::from_str(&b).map_err(|_| DiscoError::UnmarshalFailure("wtf".into()))?;
+        // .json::<TokenIntrospectionResult>()
+        // .await?;
+        println!("response: {:?}", result);
+        Ok(result.active)
     }
 
     pub async fn get_token(&self, username: &str, password: &str) -> Result<OIDCToken, DiscoError> {
