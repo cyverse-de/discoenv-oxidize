@@ -14,10 +14,6 @@ pub async fn get_token(
     State(authz_opt): State<Option<Authenticator>>,
 ) -> response::Result<Json<auth::Token>, DiscoError> {
     let password = password.unwrap_or_default();
-    println!("{:?}", username);
-    println!("{:?}", password);
-    println!("{:?}", authz_opt);
-
     if let Some(a) = authz_opt {
         Ok(Json(a.get_token(&username, &password).await?))
     } else {
