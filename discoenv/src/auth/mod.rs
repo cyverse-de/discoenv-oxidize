@@ -135,7 +135,7 @@ impl CanExpire for UserInfo {
 
         // If the call gets here, then the token isn't older than a day and hasn't expired.
         // It can be cached.
-        return false;
+        false
     }
 }
 

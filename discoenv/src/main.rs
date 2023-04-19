@@ -6,6 +6,7 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
+use discoenv::auth::middleware::RequireEntitlementsLayer;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
@@ -203,7 +204,8 @@ async fn main() -> Result<()> {
             "/:username",
             get(handlers::analyses::get_user_analyses)
         )
-        .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
+        .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
+        .layer(RequireEntitlementsLayer::new(String::from("dev")));
 
     let app = Router::new()
         .route("/", get(|| async {}))
