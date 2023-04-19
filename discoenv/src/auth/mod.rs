@@ -1,3 +1,5 @@
+pub mod middleware;
+
 use cached::{proc_macro::cached, stores::CanExpire};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
