@@ -1,21 +1,17 @@
-use std::task::{Context, Poll};
-
+use crate::app_state::DiscoenvState;
 use axum::{
-    body::Body,
-    extract::State,
+    extract::{Extension, State},
     headers::{authorization::Bearer, Authorization},
     http::{Request, StatusCode},
     middleware::Next,
     response::Response,
     RequestPartsExt, TypedHeader,
 };
-use futures::future::BoxFuture;
-use tower::{Layer, Service};
 
-use super::{Authenticator, UserInfo};
+use super::UserInfo;
 
 pub async fn auth_middleware<B>(
-    State(authz_opt): State<Option<Authenticator>>,
+    State(state): State<DiscoenvState>,
     request: Request<B>,
     next: Next<B>,
 ) -> Result<Response, StatusCode>
@@ -27,7 +23,8 @@ where
     let mut req: Request<B>;
     let user_info: UserInfo;
 
-    if let Some(authz) = authz_opt {
+    if let Some(authz) = state.auth {
+        // Make sure the token is present and valid
         let bearer: TypedHeader<Authorization<Bearer>> = parts
             .extract()
             .await
@@ -52,70 +49,58 @@ where
     Ok(next.run(req).await)
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct RequireEntitlementsLayer {
-    required: Vec<String>,
-}
-
-impl RequireEntitlementsLayer {
-    pub fn new(ent: String) -> Self {
-        Self {
-            required: vec![ent],
-        }
-    }
-
-    pub fn new_multi(ents: Vec<String>) -> Self {
-        Self { required: ents }
-    }
-
-    pub fn add(&mut self, ent: String) -> &mut RequireEntitlementsLayer {
-        self.required.push(ent);
-        self
-    }
-
-    pub fn add_multi(&mut self, ents: Vec<String>) -> &mut RequireEntitlementsLayer {
-        self.required.extend(ents);
-        self
-    }
-}
-
-impl<S> Layer<S> for RequireEntitlementsLayer {
-    type Service = RequireEntitlements<S>;
-
-    fn layer(&self, inner: S) -> Self::Service {
-        RequireEntitlements {
-            inner,
-            required: self.required.clone(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct RequireEntitlements<S> {
-    inner: S,
-    required: Vec<String>,
-}
-
-impl<S> Service<Request<Body>> for RequireEntitlements<S>
+pub async fn require_entitlements<B>(
+    State(state): State<DiscoenvState>,
+    request: Request<B>,
+    next: Next<B>,
+) -> Result<Response, StatusCode>
 where
-    S: Service<Request<Body>, Response = Response> + Send + 'static,
-    S::Future: Send + 'static,
+    B: Send,
 {
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+    let (mut parts, body) = request.into_parts();
 
-    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(ctx)
+    if let Some(check_ents) = state.admin_entitlements {
+        // This check requires that the user info be passed in,
+        // so if it's not there, they're unauthed.
+        let user_info: Extension<UserInfo> = parts
+            .extract()
+            .await
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+        // If they have no entitlements in the user info,
+        // they're not supposed to access this call.
+        if user_info.entitlement.is_none() {
+            return Err(StatusCode::FORBIDDEN);
+        }
+
+        let mut found_ent = false;
+
+        // See if any of the user's entitlments are in the
+        // list of admin entitlments listed in the configuration.
+        for req_ent in check_ents.iter() {
+            for user_ent in user_info.entitlement.clone().unwrap_or(vec![]).iter() {
+                if user_ent == req_ent {
+                    println!("found entitlement: {}", user_ent);
+                    found_ent = true
+                }
+            }
+
+            if found_ent {
+                break;
+            }
+        }
+
+        // If none of the user's entitlements are admin entitlements,
+        // then they're not allowed to make the call.
+        if !found_ent {
+            return Err(StatusCode::FORBIDDEN);
+        }
     }
 
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
-        // Do checks here
+    // If the user didn't configure any admin entitlements, then let the call through.
+    // This is useful for development, but could very well change. If it does, add an
+    // else block and return an Err(StatusCode::FORBIDDEN) from it.
 
-        let future = self.inner.call(request);
-        Box::pin(async move {
-            let response: Response = future.await?;
-            Ok(response)
-        })
-    }
+    let req = Request::from_parts(parts, body);
+    Ok(next.run(req).await)
 }

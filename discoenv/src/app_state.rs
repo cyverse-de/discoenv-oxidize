@@ -9,6 +9,7 @@ pub struct DiscoenvState {
     pub pool: Arc<Pool<Postgres>>,
     pub handler_config: handlers::config::HandlerConfiguration,
     pub auth: Option<auth::Authenticator>,
+    pub admin_entitlements: Option<Arc<Vec<String>>>,
 }
 
 impl FromRef<DiscoenvState> for Arc<Pool<Postgres>> {
@@ -26,5 +27,11 @@ impl FromRef<DiscoenvState> for handlers::config::HandlerConfiguration {
 impl FromRef<DiscoenvState> for Option<auth::Authenticator> {
     fn from_ref(state: &DiscoenvState) -> Option<auth::Authenticator> {
         state.auth.clone()
+    }
+}
+
+impl FromRef<DiscoenvState> for Option<Arc<Vec<String>>> {
+    fn from_ref(state: &DiscoenvState) -> Option<Arc<Vec<String>>> {
+        state.admin_entitlements.clone()
     }
 }

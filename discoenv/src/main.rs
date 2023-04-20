@@ -6,7 +6,6 @@ use axum::{
 };
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
-use discoenv::auth::middleware::RequireEntitlementsLayer;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
@@ -14,7 +13,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use anyhow::{Result, Context};
 use discoenv::app_state::DiscoenvState;
-use discoenv::auth::{self, middleware::auth_middleware};
+use discoenv::auth::{self, middleware::{auth_middleware, require_entitlements}};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
@@ -44,11 +43,17 @@ struct ConfigUsers {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
+struct ConfigEntitlements {
+    admin: String
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct ConfigOauth {
     uri: String,
     realm: String,
     client_id: String,
     client_secret: String,
+    entitlements: Option<ConfigEntitlements>
 }
 
 
@@ -78,6 +83,7 @@ async fn main() -> Result<()> {
         pool,
         handler_config,
         auth: None,
+        admin_entitlements: None,
     };
     
     let mut swagger_ui = SwaggerUi::new("/docs")
@@ -102,6 +108,12 @@ async fn main() -> Result<()> {
             &o.client_id,
             &o.client_secret,
         )?);
+
+        if o.entitlements.is_some() {
+            let e = o.entitlements.unwrap_or_default();
+            let ent_parts: Vec<String> = e.admin.as_str().split(',').map(String::from).collect();
+            state.admin_entitlements = Some(Arc::new(ent_parts));
+        }
     }
 
     #[derive(OpenApi)]
@@ -199,13 +211,16 @@ async fn main() -> Result<()> {
                 .delete(handlers::bags::delete_bag),
         );
 
+    let auth_m = middleware::from_fn_with_state(state.clone(), auth_middleware);
+    let ent_m = middleware::from_fn_with_state(state.clone(), require_entitlements);
+
     let analyses_routes = Router::new()
         .route(
             "/:username",
             get(handlers::analyses::get_user_analyses)
         )
-        .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
-        .layer(RequireEntitlementsLayer::new(String::from("dev")));
+        .layer(ent_m)
+        .layer(auth_m);
 
     let app = Router::new()
         .route("/", get(|| async {}))
