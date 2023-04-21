@@ -72,13 +72,13 @@ where
         if user_info.entitlement.is_none() {
             return Err(StatusCode::FORBIDDEN);
         }
-
+        let user_ents = user_info.entitlement.to_owned().unwrap_or(vec![]);
         let mut found_ent = false;
 
         // See if any of the user's entitlments are in the
         // list of admin entitlments listed in the configuration.
         for req_ent in check_ents.iter() {
-            for user_ent in user_info.entitlement.clone().unwrap_or(vec![]).iter() {
+            for user_ent in user_ents.iter() {
                 if user_ent == req_ent {
                     println!("found entitlement: {}", user_ent);
                     found_ent = true
