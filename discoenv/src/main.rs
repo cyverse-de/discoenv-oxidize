@@ -220,8 +220,6 @@ async fn main() -> Result<()> {
         .route(
             "/:username",
             get(handlers::analyses::get_user_analyses)
-                .layer(ent_m(service_state.clone()))
-                .layer(auth_m(service_state.clone()))
         )
         .layer(ent_m(service_state.clone()))
         .layer(auth_m(service_state.clone()));
