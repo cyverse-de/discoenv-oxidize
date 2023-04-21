@@ -159,6 +159,8 @@ impl From<TokenIntrospectionResult> for UserInfo {
     }
 }
 
+// Takes ownership of the arguments because of the requirements
+// imposed by cached.
 #[cached(result = true, sync_writes = true)]
 async fn check_token(
     url: String,
@@ -182,11 +184,11 @@ async fn check_token(
     Ok(result)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Authenticator {
-    base_url: Url,
-    introspection_url: Url,
-    token_url: Url,
+    base_url: String,
+    introspection_url: String,
+    token_url: String,
     client_id: String,
     client_secret: String,
 }
@@ -221,9 +223,9 @@ impl Authenticator {
             .push("introspect");
 
         Ok(Authenticator {
-            base_url,
-            token_url,
-            introspection_url,
+            base_url: base_url.to_string(),
+            token_url: token_url.to_string(),
+            introspection_url: introspection_url.to_string(),
             client_id: client_id.into(),
             client_secret: client_secret.into(),
         })
@@ -235,10 +237,10 @@ impl Authenticator {
 
     pub async fn validate_token(&self, token: &str) -> Result<UserInfo, DiscoError> {
         Ok(check_token(
-            self.introspection_url.to_string(),
+            self.introspection_url.clone(),
             token.to_string(),
-            self.client_id.to_string(),
-            self.client_secret.to_string(),
+            self.client_id.clone(),
+            self.client_secret.clone(),
         )
         .await?
         .into())
@@ -247,7 +249,7 @@ impl Authenticator {
     pub async fn get_token(&self, username: &str, password: &str) -> Result<Token, DiscoError> {
         let client = reqwest::Client::new();
         let resp = client
-            .post(self.token_url.as_str())
+            .post(&self.token_url)
             .form(&TokenRequest {
                 client_id: self.client_id.clone(),
                 client_secret: self.client_secret.clone(),

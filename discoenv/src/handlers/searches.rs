@@ -4,15 +4,15 @@ use axum::{
     response,
 };
 use serde_json::Map;
-use sqlx::{postgres::PgPool, types::JsonValue};
+use sqlx::types::JsonValue;
 use std::sync::Arc;
 
 use crate::db::searches::{self, SavedSearches};
 use crate::db::users;
 use crate::errors::DiscoError;
+use crate::app_state::DiscoenvState;
 
 use super::common;
-use super::config;
 
 /// Get the saved searches for a user.
 ///
@@ -38,11 +38,12 @@ use super::config;
     tag = "searches"
 )]
 pub async fn get_saved_searches(
-    State(conn): State<Arc<PgPool>>,
-    State(cfg): State<config::HandlerConfiguration>,    
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -75,13 +76,14 @@ pub async fn get_saved_searches(
     tag = "searches"
 )]
 pub async fn has_saved_searches(
-    State(conn): State<Arc<PgPool>>,
-    State(cfg): State<config::HandlerConfiguration>,    
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<StatusCode, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut status_code = StatusCode::OK;
-    let has_saved_searches = searches::has_saved_searches(conn.as_ref(), &user).await?;
+    let has_saved_searches = searches::has_saved_searches(conn, &user).await?;
     if !has_saved_searches {
         status_code = StatusCode::NOT_FOUND;
     }
@@ -113,12 +115,13 @@ pub async fn has_saved_searches(
     tag = "searches"
 )]
 pub async fn add_saved_searches(
-    State(conn): State<Arc<PgPool>>,
-    State(cfg): State<config::HandlerConfiguration>,    
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -155,12 +158,13 @@ pub async fn add_saved_searches(
     tag = "searches"
 )]
 pub async fn update_saved_searches(
-    State(conn): State<Arc<PgPool>>,
-    State(cfg): State<config::HandlerConfiguration>,    
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -197,11 +201,12 @@ pub async fn update_saved_searches(
     tag = "searches"
 )]
 pub async fn delete_saved_searches(
-    State(conn): State<Arc<PgPool>>,
-    State(cfg): State<config::HandlerConfiguration>,    
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> Result<(), DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));

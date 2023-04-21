@@ -3,20 +3,15 @@ use axum::{
     response,
 };
 use axum_auth::AuthBasic;
+use std::sync::Arc;
 
-use crate::{
-    auth::{self, Authenticator},
-    errors::DiscoError,
-};
+use crate::{app_state::DiscoenvState, auth, errors::DiscoError};
 
 pub async fn get_token(
+    State(state): State<Arc<DiscoenvState>>,
     AuthBasic((username, password)): AuthBasic,
-    State(authz_opt): State<Option<Authenticator>>,
 ) -> response::Result<Json<auth::Token>, DiscoError> {
+    let a = &state.auth;
     let password = password.unwrap_or_default();
-    if let Some(a) = authz_opt {
-        Ok(Json(a.get_token(&username, &password).await?))
-    } else {
-        Err(DiscoError::BadRequest("authentication not enabled".into()))
-    }
+    Ok(Json(a.get_token(&username, &password).await?))
 }
