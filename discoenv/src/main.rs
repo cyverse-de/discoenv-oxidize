@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use axum::{
     middleware,
     routing::get,
@@ -11,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use anyhow::{Result, Context};
 use discoenv::app_state::DiscoenvState;
 use discoenv::auth::{self, middleware::{auth_middleware, require_entitlements}};
 use discoenv::errors;
@@ -19,6 +17,7 @@ use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
+use std::process;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -65,13 +64,28 @@ struct Config {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     let cli = Cli::parse();
 
-    let cfg_file = std::fs::File::open(&cli.config).expect("could not open configuration file");
-    let cfg: Config = serde_yaml::from_reader(cfg_file).expect("could not read values from configuration file");
+    let cfg_file = std::fs::File::open(&cli.config).unwrap_or_else(|err| {
+        eprintln!("error opening configuration file: {err}");
+        process::exit(exitcode::IOERR);
+    });
+    
+    let cfg: Config = serde_yaml::from_reader(cfg_file).unwrap_or_else(|err| {
+        eprintln!("error reading values from configuration file: {err}");
+        process::exit(exitcode::CONFIG);
+    });
 
-    let pool = PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?;
+    let pool = PgPool::connect(&cfg.db.uri).await.unwrap_or_else(|err| {
+        eprintln!("error connecting to the db: {err}");
+        process::exit(exitcode::IOERR);
+    });
+
+    if cfg.oauth.is_none() {
+        eprintln!("missing oauth configuration");
+        process::exit(exitcode::CONFIG);
+    }
 
     let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
@@ -89,31 +103,33 @@ async fn main() -> Result<()> {
     let mut swagger_ui = SwaggerUi::new("/docs")
         .url("/openapi.json", ApiDoc::openapi());
 
+    let o = cfg.oauth.unwrap_or_default();
+    swagger_ui = swagger_ui
+        .oauth(
+            oauth::Config::new()
+                .client_id(&o.client_id)
+                .client_secret(&o.client_secret)
+                .realm(&o.realm)
+        )
+        .config(
+            utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
+        );
 
-    if cfg.oauth.is_some() {
-        let o = cfg.oauth.unwrap_or_default();
-        swagger_ui = swagger_ui
-            .oauth(
-                oauth::Config::new()
-                    .client_id(&o.client_id)
-                    .client_secret(&o.client_secret)
-                    .realm(&o.realm)
-            )
-            .config(
-                utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
-            );
-        state.auth = auth::Authenticator::setup(
-            &o.uri,
-            &o.realm,
-            &o.client_id,
-            &o.client_secret,
-        )?;
+    state.auth = auth::Authenticator::setup(
+        &o.uri,
+        &o.realm,
+        &o.client_id,
+        &o.client_secret,
+    )
+        .unwrap_or_else(|e| {
+            eprintln!("error setting up authentication: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
 
-        if o.entitlements.is_some() {
-            let e = o.entitlements.unwrap_or_default();
-            let ent_parts: Vec<String> = e.admin.as_str().split(',').map(String::from).collect();
-            state.admin_entitlements = ent_parts;
-        }
+    if o.entitlements.is_some() {
+        let e = o.entitlements.unwrap_or_default();
+        let ent_parts: Vec<String> = e.admin.as_str().split(',').map(String::from).collect();
+        state.admin_entitlements = ent_parts;
     }
 
     #[derive(OpenApi)]
@@ -160,7 +176,11 @@ async fn main() -> Result<()> {
 
     struct ApiDoc;
     axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
-       .map_err(|e| anyhow!(format!("{:?}", e)))? ;
+        .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))
+        .unwrap_or_else(|e| {
+            eprintln!("error setting up tracing: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
 
     let service_state = Arc::new(state);
 
@@ -238,12 +258,18 @@ async fn main() -> Result<()> {
         .layer(opentelemetry_tracing_layer())
         .with_state(service_state);
 
-    let addr = "0.0.0.0:60000".parse()?;
+    let addr = "0.0.0.0:60000".parse().unwrap_or_else(|e| {
+        eprintln!("error parsing address: {e}");
+        process::exit(exitcode::SOFTWARE);
+    });
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal()).await?;
+        .with_graceful_shutdown(shutdown_signal()).await.unwrap_or_else(|e| {
+            eprintln!("error shutting down: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
 
 
-    Ok(())
+    process::exit(exitcode::OK);
 }
