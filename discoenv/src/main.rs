@@ -8,7 +8,10 @@ use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
-use utoipa::OpenApi;
+use utoipa::{
+    openapi::security::{SecurityScheme, ApiKey, ApiKeyValue, Http, HttpAuthScheme}, 
+    OpenApi, Modify,
+};
 use utoipa_swagger_ui::SwaggerUi;
 use discoenv::app_state::DiscoenvState;
 use discoenv::auth::{self, middleware::{auth_middleware, require_entitlements}};
@@ -135,6 +138,7 @@ async fn main() {
     #[derive(OpenApi)]
     #[openapi(
         paths(
+            handlers::tokens::get_token,
             handlers::analyses::get_user_analyses,
             handlers::bags::get_user_bags,
             handlers::bags::delete_user_bags,
@@ -163,18 +167,38 @@ async fn main() {
                 preferences::Preferences,
                 searches::SavedSearches,
                 errors::DiscoError,
+                auth::Token,
             )
         ),
-        security(
-            (),
-            ("open_id_connect" = [])
-        ),
-        tags(
-            (name = "user-info", description="User information API")
-        )
+        modifiers(&SecurityAddon),
     )]
 
     struct ApiDoc;
+    
+    struct SecurityAddon;
+
+    impl Modify for SecurityAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            if let Some(components) = openapi.components.as_mut() {
+                components.add_security_scheme(
+                    "api_key",
+                    SecurityScheme::ApiKey(
+                        ApiKey::Header(ApiKeyValue::new("Authorization")),
+                    ),
+                );
+
+                components.add_security_scheme(
+                    "http",
+                    SecurityScheme::Http(
+                        Http::new(
+                            HttpAuthScheme::Basic,
+                        )
+                    )
+                );
+            }
+        }
+    }
+    
     axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
         .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))
         .unwrap_or_else(|e| {

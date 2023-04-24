@@ -18,6 +18,9 @@ use super::common;
     params(
         ("username" = String, Path, description = "A username"),
     ),
+    security(
+      ("api_key" = []),  
+    ),
     responses(
         (status = 200, description = "Lists all of a user's analyses", body = Bags),
         (status = 400, description = "Bad request.", 

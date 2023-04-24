@@ -4,10 +4,11 @@ use cached::{proc_macro::cached, stores::CanExpire};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::{ParseError, Url};
+use utoipa::ToSchema;
 
 use crate::errors::DiscoError;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, ToSchema, Serialize, Deserialize)]
 pub struct Token {
     access_token: String,
     token_type: String,
