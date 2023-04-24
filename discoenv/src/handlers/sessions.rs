@@ -3,21 +3,23 @@ use axum::{
     response,
 };
 use serde_json::Map;
-use sqlx::{postgres::PgPool, types::JsonValue};
+use sqlx::types::JsonValue;
 use std::sync::Arc;
 
+use crate::app_state::DiscoenvState;
 use crate::db::sessions::{self, Session};
 use crate::db::users;
 use crate::errors::DiscoError;
 
 use super::common;
-use super::config;
 
 pub async fn get_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Session>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -28,11 +30,13 @@ pub async fn get_user_sessions(
 }
 
 pub async fn add_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
     Json(sessions): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -52,11 +56,13 @@ pub async fn add_user_sessions(
 }
 
 pub async fn update_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
     Json(sessions): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Session>, DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
@@ -76,10 +82,12 @@ pub async fn update_user_sessions(
 }
 
 pub async fn delete_user_sessions(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<(), DiscoError> {
-    let user = common::fix_username(&username, &cfg);
+    let conn = &state.pool;
+    let cfg = &state.handler_config;
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {

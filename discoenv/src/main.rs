@@ -1,4 +1,5 @@
 use axum::{
+    middleware,
     routing::get,
     Router,
 };
@@ -6,15 +7,20 @@ use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trac
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use sqlx::postgres::PgPool;
-use utoipa::OpenApi;
+use utoipa::{
+    openapi::security::{SecurityScheme, ApiKey, ApiKeyValue, Http, HttpAuthScheme}, 
+    OpenApi, Modify,
+};
 use utoipa_swagger_ui::SwaggerUi;
-use anyhow::{Result, Context, anyhow};
+use discoenv::app_state::DiscoenvState;
+use discoenv::auth::{self, middleware::{auth_middleware, require_entitlements}};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
+use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
+use std::process;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)]
@@ -28,57 +34,111 @@ struct Cli {
     config: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct ConfigDB {
     uri: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct ConfigUsers {
     domain: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ConfigNatsTls{
-    enabled: bool,
-    crt: Option<String>,
-    key: Option<String>,
-    ca: Option<String>
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct ConfigEntitlements {
+    admin: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ConfigNATS {
-    server_urls: String,
-    creds: Option<String>,
-    max_reconnects: Option<u32>,
-    reconnect_wait: Option<u32>,
-    tls: ConfigNatsTls
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct ConfigOauth {
+    uri: String,
+    realm: String,
+    client_id: String,
+    client_secret: String,
+    entitlements: Option<ConfigEntitlements>
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 struct Config {
     db: ConfigDB, 
     users: ConfigUsers,
-    nats: ConfigNATS, 
+    oauth: Option<ConfigOauth>,
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
     let cli = Cli::parse();
 
-    let cfg_file = std::fs::File::open(&cli.config).expect(&format!("could not open file {}", &cli.config));
-    let cfg: Config = serde_yaml::from_reader(cfg_file).expect(&format!("could not read values from {}", &cli.config));
+    let cfg_file = std::fs::File::open(&cli.config).unwrap_or_else(|err| {
+        eprintln!("error opening configuration file: {err}");
+        process::exit(exitcode::IOERR);
+    });
+    
+    let cfg: Config = serde_yaml::from_reader(cfg_file).unwrap_or_else(|err| {
+        eprintln!("error reading values from configuration file: {err}");
+        process::exit(exitcode::CONFIG);
+    });
 
-    let pool = Arc::new(PgPool::connect(&cfg.db.uri).await.context("error connecting to db")?);
+    let pool = PgPool::connect(&cfg.db.uri).await.unwrap_or_else(|err| {
+        eprintln!("error connecting to the db: {err}");
+        process::exit(exitcode::IOERR);
+    });
+
+    if cfg.oauth.is_none() {
+        eprintln!("missing oauth configuration");
+        process::exit(exitcode::CONFIG);
+    }
 
     let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
+        do_auth: cfg.oauth.is_some(),
     };
+
+    let mut state = DiscoenvState {
+        pool,
+        handler_config,
+        auth: auth::Authenticator::default(),
+        admin_entitlements: vec![],
+    };
+    
+    let mut swagger_ui = SwaggerUi::new("/docs")
+        .url("/openapi.json", ApiDoc::openapi());
+
+    let o = cfg.oauth.unwrap_or_default();
+    swagger_ui = swagger_ui
+        .oauth(
+            oauth::Config::new()
+                .client_id(&o.client_id)
+                .client_secret(&o.client_secret)
+                .realm(&o.realm)
+        )
+        .config(
+            utoipa_swagger_ui::Config::default().oauth2_redirect_url(&o.uri)
+        );
+
+    state.auth = auth::Authenticator::setup(
+        &o.uri,
+        &o.realm,
+        &o.client_id,
+        &o.client_secret,
+    )
+        .unwrap_or_else(|e| {
+            eprintln!("error setting up authentication: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
+
+    if o.entitlements.is_some() {
+        let e = o.entitlements.unwrap_or_default();
+        let ent_parts: Vec<String> = e.admin.as_str().split(',').map(String::from).collect();
+        state.admin_entitlements = ent_parts;
+    }
 
     #[derive(OpenApi)]
     #[openapi(
         paths(
+            handlers::tokens::get_token,
             handlers::analyses::get_user_analyses,
             handlers::bags::get_user_bags,
             handlers::bags::delete_user_bags,
@@ -107,42 +167,72 @@ async fn main() -> Result<()> {
                 preferences::Preferences,
                 searches::SavedSearches,
                 errors::DiscoError,
+                auth::Token,
             )
         ),
-        tags(
-            (name = "user-info", description="User information API")
-        )
+        modifiers(&SecurityAddon),
     )]
 
     struct ApiDoc;
+    
+    struct SecurityAddon;
+
+    impl Modify for SecurityAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            if let Some(components) = openapi.components.as_mut() {
+                components.add_security_scheme(
+                    "api_key",
+                    SecurityScheme::ApiKey(
+                        ApiKey::Header(ApiKeyValue::new("Authorization")),
+                    ),
+                );
+
+                components.add_security_scheme(
+                    "http",
+                    SecurityScheme::Http(
+                        Http::new(
+                            HttpAuthScheme::Basic,
+                        )
+                    )
+                );
+            }
+        }
+    }
+    
     axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
-        .map_err(|e| anyhow!(format!("{:?}", e)))? ;
+        .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))
+        .unwrap_or_else(|e| {
+            eprintln!("error setting up tracing: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
+
+    let service_state = Arc::new(state);
 
     let pref_routes = Router::new()
         .route(
             "/:username",
             get(handlers::preferences::get_user_preferences)
-            .put(handlers::preferences::add_user_preferences)
-            .post(handlers::preferences::update_user_preferences)
-            .delete(handlers::preferences::delete_user_preferences)
+                .put(handlers::preferences::add_user_preferences)
+                .post(handlers::preferences::update_user_preferences)
+                .delete(handlers::preferences::delete_user_preferences)
         );
 
     let searches_routes = Router::new()
         .route(
             "/:username",
             get(handlers::searches::get_saved_searches)
-            .put(handlers::searches::add_saved_searches)
-            .post(handlers::searches::update_saved_searches)
-            .delete(handlers::searches::delete_saved_searches)
+                .put(handlers::searches::add_saved_searches)
+                .post(handlers::searches::update_saved_searches)
+                .delete(handlers::searches::delete_saved_searches)
         );
 
     let sessions_routes = Router::new()
         .route(
             "/:username",
             get(handlers::sessions::get_user_sessions)
-            .put(handlers::sessions::add_user_sessions)
-            .post(handlers::sessions::update_user_sessions)
-            .delete(handlers::sessions::delete_user_sessions)
+                .put(handlers::sessions::add_user_sessions)
+                .post(handlers::sessions::update_user_sessions)
+                .delete(handlers::sessions::delete_user_sessions)
         );
 
     let bag_routes = Router::new()
@@ -167,31 +257,43 @@ async fn main() -> Result<()> {
                 .delete(handlers::bags::delete_bag),
         );
 
+    let auth_m = |s| middleware::from_fn_with_state(s, auth_middleware);
+    let ent_m = |s| middleware::from_fn_with_state(s, require_entitlements);
+
     let analyses_routes = Router::new()
         .route(
             "/:username",
             get(handlers::analyses::get_user_analyses)
-        );
+        )
+        .layer(ent_m(service_state.clone()))
+        .layer(auth_m(service_state.clone()));
 
     let app = Router::new()
         .route("/", get(|| async {}))
-        .merge(SwaggerUi::new("/docs").url("/openapi.json", ApiDoc::openapi()))
+        .merge(swagger_ui)
         .nest("/analyses", analyses_routes)
         .nest("/bags", bag_routes)
         .nest("/searches", searches_routes)
         .nest("/sessions", sessions_routes)
         .nest("/preferences", pref_routes)
         .route("/otel", get(handlers::otel::report_otel))
+        .route("/token", get(handlers::tokens::get_token))
         .layer(response_with_trace_layer())
         .layer(opentelemetry_tracing_layer())
-        .with_state((pool.clone(), handler_config));
+        .with_state(service_state);
 
-    let addr = "0.0.0.0:60000".parse()?;
+    let addr = "0.0.0.0:60000".parse().unwrap_or_else(|e| {
+        eprintln!("error parsing address: {e}");
+        process::exit(exitcode::SOFTWARE);
+    });
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal()).await?;
+        .with_graceful_shutdown(shutdown_signal()).await.unwrap_or_else(|e| {
+            eprintln!("error shutting down: {e}");
+            process::exit(exitcode::SOFTWARE);
+        });
 
 
-    Ok(())
+    process::exit(exitcode::OK);
 }

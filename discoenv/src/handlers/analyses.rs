@@ -2,22 +2,24 @@ use axum::{
     extract::{Json, Path, State},
     response,
 };
-use sqlx::postgres::PgPool;
 use std::sync::Arc;
 
 use crate::db::analyses;
 
+use crate::app_state::DiscoenvState;
 use crate::errors::DiscoError;
 use debuff::analysis;
 
 use super::common;
-use super::config;
 
 #[utoipa::path(
     get,
     path = "/analyses/{username}",
     params(
         ("username" = String, Path, description = "A username"),
+    ),
+    security(
+      ("api_key" = []),  
     ),
     responses(
         (status = 200, description = "Lists all of a user's analyses", body = Bags),
@@ -34,10 +36,12 @@ use super::config;
     tag = "analyses"
 )]
 pub async fn get_user_analyses(
-    State((conn, cfg)): State<(Arc<PgPool>, config::HandlerConfiguration)>,
+    State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Vec<analysis::Analysis>>, DiscoError> {
-    let mut tx = conn.begin().await?;
-    let user = common::validate_username(&mut tx, &username, &cfg).await?;
+    let pool = &state.pool;
+    let handler_config = &state.handler_config;
+    let mut tx = pool.begin().await?;
+    let user = common::validate_username(&mut tx, &username, handler_config).await?;
     Ok(Json(analyses::get_user_analyses(&mut tx, &user).await?))
 }

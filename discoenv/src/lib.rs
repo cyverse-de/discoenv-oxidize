@@ -7,6 +7,7 @@ pub mod handlers {
     pub mod preferences;
     pub mod searches;
     pub mod sessions;
+    pub mod tokens;
 }
 
 pub mod db {
@@ -18,5 +19,7 @@ pub mod db {
     pub mod users;
 }
 
+pub mod app_state;
+pub mod auth;
 pub mod errors;
 pub mod signals;

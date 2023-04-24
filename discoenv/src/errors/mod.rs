@@ -4,12 +4,13 @@ use axum::{
 };
 use debuff::header;
 use debuff::svcerror::{ErrorCode, ServiceError};
+use reqwest;
 use serde_json::json;
 use utoipa::ToSchema;
 
 use thiserror;
 
-#[derive(thiserror::Error, Debug, ToSchema, serde::Serialize, serde::Deserialize)]
+#[derive(thiserror::Error, Clone, Debug, ToSchema, serde::Serialize, serde::Deserialize)]
 pub enum DiscoError {
     /// Something was unset.
     #[error("unset: {0}")]
@@ -55,6 +56,26 @@ pub enum DiscoError {
     #[error("parameter invalid: {0}")]
     #[schema()]
     ParameterInvalid(String),
+
+    #[error("unauthenticated: {0}")]
+    #[schema()]
+    Unauthenticated(String),
+
+    #[error("forbidden: {0}")]
+    #[schema()]
+    Forbidden(String),
+
+    #[error("timed out: {0}")]
+    #[schema()]
+    Timeout(String),
+
+    #[error("unsupported operation: {0}")]
+    #[schema()]
+    Unsupported(String),
+
+    #[error("unimplemented: {0}")]
+    #[schema()]
+    Unimplemented(String),
 }
 
 impl DiscoError {
@@ -66,9 +87,14 @@ impl DiscoError {
             DiscoError::NotFound(_) => ErrorCode::NotFound,
             DiscoError::BadRequest(_) => ErrorCode::BadRequest,
             DiscoError::MarshalFailure(_) => ErrorCode::Internal,
-            DiscoError::UnmarshalFailure(_) => ErrorCode::BadRequest,
-            DiscoError::ParameterMissing(_) => ErrorCode::BadRequest,
-            DiscoError::ParameterInvalid(_) => ErrorCode::BadRequest,
+            DiscoError::UnmarshalFailure(_) => ErrorCode::UnmarshalFailure,
+            DiscoError::ParameterMissing(_) => ErrorCode::ParameterMissing,
+            DiscoError::ParameterInvalid(_) => ErrorCode::ParameterInvalid,
+            DiscoError::Unauthenticated(_) => ErrorCode::Unauthenticated,
+            DiscoError::Forbidden(_) => ErrorCode::Forbidden,
+            DiscoError::Timeout(_) => ErrorCode::Timeout,
+            DiscoError::Unsupported(_) => ErrorCode::Unsupported,
+            DiscoError::Unimplemented(_) => ErrorCode::Unimplemented,
         }
     }
 
@@ -83,6 +109,11 @@ impl DiscoError {
             DiscoError::UnmarshalFailure(_) => StatusCode::BAD_REQUEST,
             DiscoError::ParameterMissing(_) => StatusCode::BAD_REQUEST,
             DiscoError::ParameterInvalid(_) => StatusCode::BAD_REQUEST,
+            DiscoError::Unauthenticated(_) => StatusCode::UNAUTHORIZED,
+            DiscoError::Forbidden(_) => StatusCode::FORBIDDEN,
+            DiscoError::Timeout(_) => StatusCode::REQUEST_TIMEOUT,
+            DiscoError::Unsupported(_) => StatusCode::METHOD_NOT_ALLOWED,
+            DiscoError::Unimplemented(_) => StatusCode::NOT_IMPLEMENTED,
         }
     }
 
@@ -106,6 +137,11 @@ impl DiscoError {
             DiscoError::UnmarshalFailure(m) => m.to_owned(),
             DiscoError::ParameterMissing(m) => m.to_owned(),
             DiscoError::ParameterInvalid(m) => m.to_owned(),
+            DiscoError::Unauthenticated(m) => m.to_owned(),
+            DiscoError::Forbidden(m) => m.into(),
+            DiscoError::Timeout(m) => m.into(),
+            DiscoError::Unsupported(m) => m.into(),
+            DiscoError::Unimplemented(m) => m.into(),
         }
     }
 }
@@ -123,13 +159,39 @@ impl From<ServiceError> for DiscoError {
             ErrorCode::UnmarshalFailure => DiscoError::UnmarshalFailure(msg),
             ErrorCode::ParameterMissing => DiscoError::ParameterMissing(msg),
             ErrorCode::ParameterInvalid => DiscoError::ParameterInvalid(msg),
+            ErrorCode::Unauthenticated => DiscoError::Unauthenticated(msg),
+            ErrorCode::Forbidden => DiscoError::Forbidden(msg),
+            ErrorCode::Timeout => DiscoError::Timeout(msg),
+            ErrorCode::Unsupported => DiscoError::Unsupported(msg),
+            ErrorCode::Unimplemented => DiscoError::Unimplemented(msg),
+        }
+    }
+}
+
+impl From<reqwest::Error> for DiscoError {
+    fn from(e: reqwest::Error) -> Self {
+        let msg = e.to_string();
+        if e.status().is_none() {
+            return DiscoError::Unspecified(msg);
+        }
+        let sc = e.status().unwrap_or_default();
+        match sc {
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR => DiscoError::Internal(msg),
+            reqwest::StatusCode::NOT_FOUND => DiscoError::NotFound(msg),
+            reqwest::StatusCode::BAD_REQUEST => DiscoError::BadRequest(msg),
+            reqwest::StatusCode::UNAUTHORIZED => DiscoError::Unauthenticated(msg),
+            reqwest::StatusCode::FORBIDDEN => DiscoError::Forbidden(msg),
+            reqwest::StatusCode::REQUEST_TIMEOUT => DiscoError::Timeout(msg),
+            reqwest::StatusCode::METHOD_NOT_ALLOWED => DiscoError::Unsupported(msg),
+            reqwest::StatusCode::NOT_IMPLEMENTED => DiscoError::Unimplemented(msg),
+            _ => DiscoError::Unspecified(msg),
         }
     }
 }
 
 impl From<sqlx::Error> for DiscoError {
     fn from(s: sqlx::Error) -> Self {
-        let msg = s.to_string().clone();
+        let msg = s.to_string();
         match s {
             sqlx::Error::RowNotFound => DiscoError::NotFound(msg),
             _ => DiscoError::Internal(msg),
@@ -172,22 +234,6 @@ impl IntoResponse for DiscoError {
     }
 }
 
-impl Clone for DiscoError {
-    fn clone(&self) -> DiscoError {
-        match self {
-            DiscoError::Unset(m) => DiscoError::Unset(m.to_owned()),
-            DiscoError::Unspecified(m) => DiscoError::Unspecified(m.to_owned()),
-            DiscoError::Internal(m) => DiscoError::Internal(m.to_owned()),
-            DiscoError::NotFound(m) => DiscoError::NotFound(m.to_owned()),
-            DiscoError::BadRequest(m) => DiscoError::BadRequest(m.to_owned()),
-            DiscoError::MarshalFailure(m) => DiscoError::MarshalFailure(m.to_owned()),
-            DiscoError::UnmarshalFailure(m) => DiscoError::UnmarshalFailure(m.to_owned()),
-            DiscoError::ParameterMissing(m) => DiscoError::ParameterMissing(m.to_owned()),
-            DiscoError::ParameterInvalid(m) => DiscoError::ParameterMissing(m.to_owned()),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -225,7 +271,7 @@ mod test {
         assert!(r.is_err());
 
         match r {
-            Ok(_) => assert!(false),
+            Ok(_) => panic!(),
             Err(e) => assert_eq!(e.to_string(), "not found: this is a test".to_owned()),
         };
     }
