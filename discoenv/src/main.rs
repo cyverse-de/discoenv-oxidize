@@ -6,7 +6,6 @@ use axum::{
 use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
-use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use utoipa::{
     openapi::security::{SecurityScheme, ApiKey, ApiKeyValue, Http, HttpAuthScheme}, 
@@ -21,61 +20,18 @@ use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
 use std::process;
-
-#[derive(Parser)]
-#[command(author, version, about, long_about=None)]
-struct Cli {
-    /// Whether to include the user domain if it's missing from requests.
-    #[arg(short, long, default_value_t = true)]
-    append_user_domain: bool,
-
-    /// The config file to read settings from.
-    #[arg(short, long, default_value_t = String::from("/etc/cyverse/de/configs/service.yml"))]
-    config: String
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct ConfigDB {
-    uri: String
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct ConfigUsers {
-    domain: String
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct ConfigEntitlements {
-    admin: String
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct ConfigOauth {
-    uri: String,
-    realm: String,
-    client_id: String,
-    client_secret: String,
-    entitlements: Option<ConfigEntitlements>
-}
-
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct Config {
-    db: ConfigDB, 
-    users: ConfigUsers,
-    oauth: Option<ConfigOauth>,
-}
+use discoenv::config;
 
 #[tokio::main]
 async fn main() {
-    let cli = Cli::parse();
+    let cli = config::Cli::parse();
 
     let cfg_file = std::fs::File::open(&cli.config).unwrap_or_else(|err| {
         eprintln!("error opening configuration file: {err}");
         process::exit(exitcode::IOERR);
     });
     
-    let cfg: Config = serde_yaml::from_reader(cfg_file).unwrap_or_else(|err| {
+    let cfg: config::Config = serde_yaml::from_reader(cfg_file).unwrap_or_else(|err| {
         eprintln!("error reading values from configuration file: {err}");
         process::exit(exitcode::CONFIG);
     });
