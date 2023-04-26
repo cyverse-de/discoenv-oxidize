@@ -105,9 +105,6 @@ The main goals of this repo's organization are as follows (in no particular orde
 * `Cargo.toml` - The workspace's Cargo.toml file. Lists which directories are members of the workspace.
 * `skaffold.yaml` - The skaffold YAML file for building and deploying container images into k8s.
 * `discoenv/` - The discoenv crate containing the services and shared libraries deployed from this repo.
-* `service_errors/` - A crate containing common error handling code that integrates with the ServiceError type defined by protocol buffer in the `p` repo.
-* `service_signals/` - A crate containing signal processing code that each service should use.
-* `db/` - A crate providing access to data in the Discovery Environment databases. Uses SQLX.
 * `k8s/` - Container image build and deployment information.
 
 ### Workspace
@@ -117,8 +114,6 @@ The top-level directory of the repository is a Cargo workspace. This allows us t
 The `discoenv` crate is where you should put new microservice code by default. If it's relatively simplistic code that provides access to information in the database as JSON, then consider just adding the functionality to the default binary, `discoenv`. If the code is a bit more complicated and would benefit from being able to scale separately from the rest of the services, then put it into a secondary binary in the `discoenv` crate.
 
 The primary binary for the `discoenv` crate is defined in `discoenv/src/main.rs` and is a service that provides access to relatively simple HTTP/JSON code that access the database and return JSON encoded information with minimal processing.
-
-The `user-info` service provides access to `bags`, `sessions`, `preferences`, and `saved-searches` defined by users. It is in the `discoenv/src/bin/user-info/main.rs` file.
 
 The `discoenv/src/lib.rs` file exposes modules that are provided by the `discoenv` library. They can be reused across binaries (a.k.a services) contained within the `discoenv` crate.
 
@@ -177,4 +172,50 @@ skaffold build --file-output build.json
 Deploy the built images.
 ```bash
 skaffold deploy -a build.json
+```
+
+## Development
+
+### Self-signed certs
+
+Use openssl to generate self-signed certs for development:
+```bash
+openssl genrsa -out key.pem
+openssl req -new -x509 -key key.pem -out cert.pem -days 1095
+sudo mkdir -p /etc/cyverse/de/tls/
+sudo mv key.pem cert.pem /etc/cyverse/de/tls/
+sudo chown 0644 /etc/cyverse/de/tls/key.pem /etc/cyverse/de/tls/cert.pem
+```
+### Local config
+
+Your local config can look something like this. Replace the database connection information as needed.
+
+```yaml
+db:
+  uri: postgresql://<db_user>:<db_password>@localhost:5432/<db_name>?sslmode=disable
+users:
+  domain: "@iplantcollaborative.org"
+oauth:
+  uri: <keycloak URL>
+  realm: <realm>
+  client_id: <client-id>
+  client_secret: <client-secret>
+  entitlements:
+    admin: dev
+  
+```
+### cargo watch
+
+Run `cargo install` to install `cargo-watch`:
+```bash
+cargo install cargo-watch
+```
+
+Run `cargo watch` to run the application, recompiling and restarting it on every file change:
+```bash
+cargo watch -x 'run -- --config ./test-config.yaml'  
+```
+Or, without TLS:
+```bash
+cargo watch -x 'run --config ./test-config.yaml --no-tls'
 ```
