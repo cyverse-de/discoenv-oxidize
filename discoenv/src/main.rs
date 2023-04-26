@@ -3,7 +3,6 @@ use axum::{
     routing::get,
     Router,
 };
-use axum_tracing_opentelemetry::{opentelemetry_tracing_layer, response_with_trace_layer};
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use sqlx::postgres::PgPool;
@@ -20,12 +19,17 @@ use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
 use std::process;
+use tracing::{info, debug, error};
 use discoenv::config;
 
 #[tokio::main]
 async fn main() {
+    // Set up tracing/logging using the RUST_LOG environment variable.
+    tracing_subscriber::fmt::init();
+
     let cli = config::Cli::parse();
 
+    debug!("reading config {}", cli.config);
     let cfg_file = std::fs::File::open(&cli.config).unwrap_or_else(|err| {
         eprintln!("error opening configuration file: {err}");
         process::exit(exitcode::IOERR);
@@ -36,6 +40,7 @@ async fn main() {
         process::exit(exitcode::CONFIG);
     });
 
+    info!("connecting to database");
     let pool = PgPool::connect(&cfg.db.uri).await.unwrap_or_else(|err| {
         eprintln!("error connecting to the db: {err}");
         process::exit(exitcode::IOERR);
@@ -46,6 +51,10 @@ async fn main() {
         process::exit(exitcode::CONFIG);
     }
 
+    debug!("append_user_domain: {}", cli.append_user_domain);
+    debug!("user_domain: {}", cfg.users.domain);
+    debug!("do_auth: {}", cfg.oauth.is_some());
+    
     let handler_config = handlers::config::HandlerConfiguration{
         append_user_domain: cli.append_user_domain,
         user_domain: cfg.users.domain.clone(),
@@ -58,7 +67,8 @@ async fn main() {
         auth: auth::Authenticator::default(),
         admin_entitlements: vec![],
     };
-    
+
+    debug!("setting up swagger ui");
     let mut swagger_ui = SwaggerUi::new("/docs")
         .url("/openapi.json", ApiDoc::openapi());
 
@@ -154,14 +164,9 @@ async fn main() {
             }
         }
     }
-    
-    axum_tracing_opentelemetry::tracing_subscriber_ext::init_subscribers()
-        .map_err(|e| anyhow::anyhow!(format!("{:?}", e)))
-        .unwrap_or_else(|e| {
-            eprintln!("error setting up tracing: {e}");
-            process::exit(exitcode::SOFTWARE);
-        });
 
+
+    debug!("setting up routes");
     let service_state = Arc::new(state);
 
     let pref_routes = Router::new()
@@ -232,21 +237,16 @@ async fn main() {
         .nest("/searches", searches_routes)
         .nest("/sessions", sessions_routes)
         .nest("/preferences", pref_routes)
-        .route("/otel", get(handlers::otel::report_otel))
         .route("/token", get(handlers::tokens::get_token))
-        .layer(response_with_trace_layer())
-        .layer(opentelemetry_tracing_layer())
         .with_state(service_state);
 
-    let addr = "0.0.0.0:60000".parse().unwrap_or_else(|e| {
-        eprintln!("error parsing address: {e}");
-        process::exit(exitcode::SOFTWARE);
-    });
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], cli.port));
+    info!("listening on {}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .with_graceful_shutdown(shutdown_signal()).await.unwrap_or_else(|e| {
-            eprintln!("error shutting down: {e}");
+            error!("error shutting down: {e}");
             process::exit(exitcode::SOFTWARE);
         });
 

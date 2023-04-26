@@ -11,6 +11,18 @@ pub struct Cli {
     /// The config file to read settings from.
     #[arg(short, long, default_value_t = String::from("/etc/cyverse/de/configs/service.yml"))]
     pub config: String,
+
+    /// Absolute path to the cert pem file.
+    #[arg(long, default_value_t = String::from("/etc/cyverse/de/tls/cert.pem"))]
+    pub cert: String,
+
+    /// Absolute path to the key pem file.
+    #[arg(long, default_value_t = String::from("/etc/cyverse/de/tls/key.pem"))]
+    pub key: String,
+
+    /// The listen port.
+    #[arg(short, long, default_value_t = 60000)]
+    pub port: u16,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]

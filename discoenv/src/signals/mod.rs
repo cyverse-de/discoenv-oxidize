@@ -22,5 +22,4 @@ pub async fn shutdown_signal() {
     }
 
     tracing::warn!("starting shutdown");
-    opentelemetry::global::shutdown_tracer_provider();
 }
