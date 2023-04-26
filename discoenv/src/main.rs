@@ -3,6 +3,7 @@ use axum::{
     routing::get,
     Router,
 };
+use axum_server::tls_rustls::RustlsConfig;
 use clap::Parser;
 use discoenv::db::{bags, preferences, searches};
 use sqlx::postgres::PgPool;
@@ -19,6 +20,7 @@ use discoenv::signals::shutdown_signal;
 use utoipa_swagger_ui::oauth;
 use std::sync::Arc;
 use std::process;
+use std::path::PathBuf;
 use tracing::{info, debug, error};
 use discoenv::config;
 
@@ -40,11 +42,14 @@ async fn main() {
         process::exit(exitcode::CONFIG);
     });
 
-    info!("connecting to database");
+
+    debug!("connecting to database");
     let pool = PgPool::connect(&cfg.db.uri).await.unwrap_or_else(|err| {
         eprintln!("error connecting to the db: {err}");
         process::exit(exitcode::IOERR);
     });
+
+
 
     if cfg.oauth.is_none() {
         eprintln!("missing oauth configuration");
@@ -241,15 +246,33 @@ async fn main() {
         .with_state(service_state);
 
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], cli.port));
-    info!("listening on {}", addr);
-
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .with_graceful_shutdown(shutdown_signal()).await.unwrap_or_else(|e| {
-            error!("error shutting down: {e}");
-            process::exit(exitcode::SOFTWARE);
+    
+    debug!("no_tls is {}", cli.no_tls);
+    if !cli.no_tls {
+        let tls_config = RustlsConfig::from_pem_file(
+            PathBuf::from(&cli.cert),
+            PathBuf::from(&cli.key),
+        )
+        .await
+        .unwrap_or_else(|err| {
+            error!("error setting up TLS: {}", err);
+            process::exit(exitcode::CONFIG);
         });
 
+        info!("listening on {}", addr);
+        axum_server::bind_rustls(addr, tls_config)
+            .serve(app.into_make_service())
+            .await
+            .unwrap();
+    } else {
+        info!("listening on {}", addr);
+        axum::Server::bind(&addr)
+            .serve(app.into_make_service())
+            .with_graceful_shutdown(shutdown_signal()).await.unwrap_or_else(|e| {
+                error!("error shutting down: {e}");
+                process::exit(exitcode::SOFTWARE);
+            });
+    }
 
     process::exit(exitcode::OK);
 }

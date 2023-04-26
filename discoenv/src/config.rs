@@ -8,21 +8,25 @@ pub struct Cli {
     #[arg(short, long, default_value_t = true)]
     pub append_user_domain: bool,
 
-    /// The config file to read settings from.
+    /// Path to the configuration file.
     #[arg(short, long, default_value_t = String::from("/etc/cyverse/de/configs/service.yml"))]
     pub config: String,
 
-    /// Absolute path to the cert pem file.
+    /// Path to the TLS cert PEM file.
     #[arg(long, default_value_t = String::from("/etc/cyverse/de/tls/cert.pem"))]
     pub cert: String,
 
-    /// Absolute path to the key pem file.
+    /// Path to the TLS key PEM file.
     #[arg(long, default_value_t = String::from("/etc/cyverse/de/tls/key.pem"))]
     pub key: String,
 
     /// The listen port.
     #[arg(short, long, default_value_t = 60000)]
     pub port: u16,
+
+    /// Whether to use TLS.
+    #[arg(short, long)]
+    pub no_tls: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
