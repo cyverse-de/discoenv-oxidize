@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, Extension, State},
     response,
 };
 use serde_json::Map;
@@ -9,6 +9,7 @@ use std::sync::Arc;
 use crate::{db::preferences::{self, Preferences}, app_state::DiscoenvState};
 use crate::db::users;
 use crate::errors::DiscoError;
+use crate::auth::UserInfo;
 
 use super::common;
 
@@ -17,10 +18,7 @@ use super::common;
 /// Returns the preferences as a JSON document.
 #[utoipa::path(
     get,
-    path = "/preferences/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/preferences",
     responses(
         (status = 200, description = "Body contains the user's preferences", body = Preferences),
         (status = 400, description = "Bad request", body = DiscoError,
@@ -36,12 +34,10 @@ use super::common;
 )]
 pub async fn get_user_preferences(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<Json<Preferences>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
@@ -55,10 +51,7 @@ pub async fn get_user_preferences(
 /// just useful for setting up new users.
 #[utoipa::path(
     put,
-    path = "/preferences/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/preferences",
     request_body = JsonValue::Object<Preferences>,
     responses(
         (status = 200, description = "Adds a new set of user preferences", body = common::ID),
@@ -77,13 +70,11 @@ pub async fn get_user_preferences(
 )]
 pub async fn add_user_preferences(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(preferences): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -106,11 +97,8 @@ pub async fn add_user_preferences(
 /// Returns the updated preferences for the user.
 #[utoipa::path(
     post,
-    path = "/preferences/{username}",
+    path = "/preferences",
     request_body = JsonValue::Object<Preferences>,
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
     responses(
         (status = 200, description = "Returned the updated user preferences", body = Preferences),
         (status = 400, description = "Bad request.", 
@@ -127,13 +115,11 @@ pub async fn add_user_preferences(
 )]
 pub async fn update_user_preferences(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(preferences): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Preferences>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -156,10 +142,7 @@ pub async fn update_user_preferences(
 /// Returns a 200 status code on success.
 #[utoipa::path(
     delete,
-    path = "/preferences/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/preferences",
     responses(
         (status = 200, description = "The preferences were successfully deleted"),
         (status = 400, description = "Bad request.", 
@@ -177,12 +160,10 @@ pub async fn update_user_preferences(
 )]
 pub async fn delete_user_preferences(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<(), DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));

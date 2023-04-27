@@ -183,7 +183,8 @@ async fn main() {
                 .put(handlers::preferences::add_user_preferences)
                 .post(handlers::preferences::update_user_preferences)
                 .delete(handlers::preferences::delete_user_preferences)
-        );
+        )
+        .layer(auth_m(service_state.clone()));
 
     let searches_routes = Router::new()
         .route(
