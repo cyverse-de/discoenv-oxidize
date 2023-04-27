@@ -30,12 +30,12 @@ pub async fn list_bags<'a, E>(conn: E) -> Result<Vec<Bag>, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    Ok(query_as!(
+    query_as!(
         Bag,
         r#"select id, user_id, contents as "contents: Json<Map<String, JsonValue>>" from bags"#
     )
     .fetch_all(conn)
-    .await?)
+    .await
 }
 
 pub async fn list_user_bags<'a, E>(conn: E, username: &str) -> Result<Bags, sqlx::Error>
@@ -218,7 +218,7 @@ pub async fn get_bag<'a, E>(conn: E, username: &str, bag_id: &Uuid) -> Result<Ba
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    Ok(query_as!(
+    query_as!(
         Bag,
         r#"
             SELECT
@@ -236,7 +236,7 @@ where
         bag_id,
     )
     .fetch_one(conn)
-    .await?)
+    .await
 }
 
 pub async fn set_default_bag<'a, E>(

@@ -12,6 +12,9 @@ use debuff::analysis;
 
 use super::common;
 
+/// List the analyses for the logged-in user
+///
+/// Returns a list of analyses for the user.
 #[utoipa::path(
     get,
     path = "/analyses/{username}",
@@ -39,9 +42,7 @@ pub async fn get_user_analyses(
     State(state): State<Arc<DiscoenvState>>,
     Path(username): Path<String>,
 ) -> response::Result<Json<Vec<analysis::Analysis>>, DiscoError> {
-    let pool = &state.pool;
-    let handler_config = &state.handler_config;
-    let mut tx = pool.begin().await?;
-    let user = common::validate_username(&mut tx, &username, handler_config).await?;
+    let mut tx = state.pool.begin().await?;
+    let user = common::validate_username(&mut tx, &username, &state.handler_config).await?;
     Ok(Json(analyses::get_user_analyses(&mut tx, &user).await?))
 }

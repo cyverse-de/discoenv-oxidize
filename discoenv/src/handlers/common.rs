@@ -1,7 +1,7 @@
 use super::config;
 use crate::db::users;
-use serde::{Deserialize, Serialize};
 use crate::errors::DiscoError;
+use serde::{Deserialize, Serialize};
 use sqlx::types::Uuid;
 use utoipa::ToSchema;
 
@@ -15,7 +15,7 @@ pub fn fix_username(username: &str, cfg: &config::HandlerConfiguration) -> Strin
 
     if cfg.append_user_domain && !cfg.user_domain.is_empty() && !retval.ends_with(&cfg.user_domain)
     {
-        if !cfg.user_domain.starts_with("@") {
+        if !cfg.user_domain.starts_with('@') {
             retval = format!("{}@", retval);
         }
         retval = format!("{}{}", retval, cfg.user_domain);
@@ -32,7 +32,7 @@ pub async fn validate_username<'a, E>(
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    let user = fix_username(&username, &cfg);
+    let user = fix_username(username, cfg);
 
     if !users::username_exists(conn, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));

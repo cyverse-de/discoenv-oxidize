@@ -132,7 +132,7 @@ pub async fn update_user_preferences(
 ) -> response::Result<Json<Preferences>, DiscoError> {
     let conn = &state.pool;
     let cfg = &state.handler_config;
-    let user = common::fix_username(&username, &cfg);
+    let user = common::fix_username(&username, cfg);
     let mut tx = conn.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
