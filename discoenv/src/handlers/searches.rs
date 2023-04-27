@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Json, Extension, State},
     http::StatusCode,
     response,
 };
@@ -11,6 +11,7 @@ use crate::db::searches::{self, SavedSearches};
 use crate::db::users;
 use crate::errors::DiscoError;
 use crate::app_state::DiscoenvState;
+use crate::auth::UserInfo;
 
 use super::common;
 
@@ -19,10 +20,7 @@ use super::common;
 /// Returns the JSON document containing the saved searches for a user.
 #[utoipa::path(
     get,
-    path = "/searches/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/searches",
     responses(
         (status = 200, description = "Returned the user's saved searches", body = SavedSearches),
         (status = 400, description = "Bad request.", 
@@ -39,12 +37,10 @@ use super::common;
 )]
 pub async fn get_saved_searches(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
@@ -57,10 +53,7 @@ pub async fn get_saved_searches(
 /// Returns a 200 status if the user has saved searches.
 #[utoipa::path(
     head,
-    path = "/searches/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/searches",
     responses(
         (status = 200, description = "The user has saved searches"),
         (status = 400, description = "Bad request.", 
@@ -77,13 +70,11 @@ pub async fn get_saved_searches(
 )]
 pub async fn has_saved_searches(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<StatusCode, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
     let mut status_code = StatusCode::OK;
-    let has_saved_searches = searches::has_saved_searches(conn, &user).await?;
+    let has_saved_searches = searches::has_saved_searches(&state.pool, &user).await?;
     if !has_saved_searches {
         status_code = StatusCode::NOT_FOUND;
     }
@@ -95,10 +86,7 @@ pub async fn has_saved_searches(
 /// Adds a new saved searches document for a user. Only really useful when setting up a new user.
 #[utoipa::path(
     put,
-    path = "/searches/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/searches",
     request_body = JsonValue::Object<Searches>,
     responses(
         (status = 200, description = "The saved searches document was added", body = common::ID),
@@ -116,13 +104,11 @@ pub async fn has_saved_searches(
 )]
 pub async fn add_saved_searches(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
@@ -138,10 +124,7 @@ pub async fn add_saved_searches(
 /// Returns the updated searches document.
 #[utoipa::path(
     post,
-    path = "/searches/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/searches",
     request_body = JsonValue::Object<Searches>,
     responses(
         (status = 200, description = "The saved searches document was updated", body = JsonValue::Object<Searches>),
@@ -159,13 +142,11 @@ pub async fn add_saved_searches(
 )]
 pub async fn update_saved_searches(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(saved_searches): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<SavedSearches>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }
@@ -182,10 +163,7 @@ pub async fn update_saved_searches(
 /// Returns a 200 status code on success.
 #[utoipa::path(
     delete,
-    path = "/searches/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/searches",
     responses(
         (status = 200, description = "The saved searches document was deleted"),
         (status = 400, description = "Bad request.", 
@@ -202,12 +180,10 @@ pub async fn update_saved_searches(
 )]
 pub async fn delete_saved_searches(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> Result<(), DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
     }

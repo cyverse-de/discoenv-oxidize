@@ -192,7 +192,8 @@ async fn main() {
                 .put(handlers::searches::add_saved_searches)
                 .post(handlers::searches::update_saved_searches)
                 .delete(handlers::searches::delete_saved_searches)
-        );
+        )
+        .layer(auth_m(service_state.clone()));
 
     let sessions_routes = Router::new()
         .route(
