@@ -76,7 +76,6 @@ where
     for req_ent in check_ents.iter() {
         for user_ent in user_ents.iter() {
             if user_ent == req_ent {
-                println!("found entitlement: {}", user_ent);
                 found_ent = true
             }
         }
