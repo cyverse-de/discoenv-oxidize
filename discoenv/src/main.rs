@@ -201,7 +201,8 @@ async fn main() {
                 .put(handlers::sessions::add_user_sessions)
                 .post(handlers::sessions::update_user_sessions)
                 .delete(handlers::sessions::delete_user_sessions)
-        );
+        )
+        .layer(auth_m(service_state.clone()));
 
     let bag_routes = Router::new()
         .route("/", get(|| async {}))
