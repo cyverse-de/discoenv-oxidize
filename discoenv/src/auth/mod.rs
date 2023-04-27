@@ -98,7 +98,8 @@ pub struct UserInfo {
 impl CanExpire for UserInfo {
     fn is_expired(&self) -> bool {
         // Don't cache inactive token introspection results.
-        // Could result in users being unable to authenticate for a day after a failure.
+        // Doing that could result in preventing a user from logging in for a day,
+        // which is bad.
         if !self.active {
             return true;
         }

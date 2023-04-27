@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Json, Path, State},
+    extract::{Extension, Json, State},
     response,
 };
 use std::sync::Arc;
@@ -11,16 +11,14 @@ use crate::errors::DiscoError;
 use debuff::analysis;
 
 use super::common;
+use crate::auth::UserInfo;
 
 /// List the analyses for the logged-in user
 ///
 /// Returns a list of analyses for the user.
 #[utoipa::path(
     get,
-    path = "/analyses/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/analyses",
     security(
       ("api_key" = []),  
     ),
@@ -40,9 +38,14 @@ use super::common;
 )]
 pub async fn get_user_analyses(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<Json<Vec<analysis::Analysis>>, DiscoError> {
     let mut tx = state.pool.begin().await?;
-    let user = common::validate_username(&mut tx, &username, &state.handler_config).await?;
+    let user = common::validate_username(
+        &mut tx,
+        &user_info.preferred_username.unwrap_or_default(),
+        &state.handler_config,
+    )
+    .await?;
     Ok(Json(analyses::get_user_analyses(&mut tx, &user).await?))
 }

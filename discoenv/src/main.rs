@@ -228,7 +228,7 @@ async fn main() {
 
     let analyses_routes = Router::new()
         .route(
-            "/:username",
+            "/",
             get(handlers::analyses::get_user_analyses)
         )
         .layer(ent_m(service_state.clone()))
