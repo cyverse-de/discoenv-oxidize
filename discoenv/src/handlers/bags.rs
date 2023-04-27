@@ -1,14 +1,14 @@
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
-    response,
+    response, Extension,
 };
 use serde_json::Map;
 use sqlx::types::{JsonValue, Uuid};
 use std::sync::Arc;
 
 
-use crate::db::{bags::{self, Bag}, users};
+use crate::{db::{bags::{self, Bag}, users}, auth::UserInfo};
 use crate::db::bags::{list_user_bags, Bags};
 use crate::errors::DiscoError;
 use crate::app_state::DiscoenvState;
@@ -19,10 +19,7 @@ use super::common;
 /// Returns a complete listing of all of the user's bags. Mostly useful for administrative purposes.
 #[utoipa::path(
     get,
-    path = "/bags/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags",
     responses(
         (status = 200, description = "Lists all of a user's bags", body = Bags),
         (status = 400, description = "Bad request.", 
@@ -39,12 +36,10 @@ use super::common;
 )]
 pub async fn get_user_bags(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>, // Pulls the username out out of the Path and turns it into a String.
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<Json<Bags>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -58,10 +53,7 @@ pub async fn get_user_bags(
 /// You probably don't want to actually call this.
 #[utoipa::path(
     delete,
-    path = "/bags/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags",
     responses(
         (status = 200, description="Deleted all of the user's bags."),
         (status = 400, description = "Bad request.", 
@@ -78,12 +70,10 @@ pub async fn get_user_bags(
 )]
 pub async fn delete_user_bags(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<(), DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -101,10 +91,7 @@ pub async fn delete_user_bags(
 /// Adds a new bag for a user. It is not set to the default.
 #[utoipa::path(
     put,
-    path = "/bags/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags",
     request_body = JsonValue::Object,
     responses(
         (status = 200, description = "Adds a bag for a user", body = ID),
@@ -122,13 +109,11 @@ pub async fn delete_user_bags(
 )]
 pub  async fn add_user_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<common::ID>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -148,10 +133,7 @@ pub  async fn add_user_bag(
 /// Check the status code to tell whether the user has any bags defined.
 #[utoipa::path(
     head,
-    path = "/bags/{username}",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags",
     responses(
         (status = 200, description = "The user had one or more bags."),
         (status = 404, description = "The user had no bags."),
@@ -166,13 +148,11 @@ pub  async fn add_user_bag(
 )]
 pub async fn user_has_bags(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<StatusCode, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
     let mut status_code = StatusCode::OK;
-    let has_bag = bags::user_has_bags(conn, &user).await?;
+    let has_bag = bags::user_has_bags(&state.pool, &user).await?;
     if !has_bag {
         status_code = StatusCode::NOT_FOUND
     }
@@ -184,9 +164,8 @@ pub async fn user_has_bags(
 /// Returns a bag owned by a user. Does not have to be the default bag.
 #[utoipa::path(
     get,
-    path = "/bags/{username}/{bag_id}",
+    path = "/bags/{bag_id}",
     params(
-        ("username" = String, Path, description = "A username"),
         ("bag_id" = String, Path, description = "A bag's UUID"),
     ),
     responses(
@@ -202,12 +181,11 @@ pub async fn user_has_bags(
 )]
 pub async fn get_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path((username, bag_id)): Path<(String, Uuid)>,
+    Extension(user_info): Extension<UserInfo>,
+    Path(bag_id): Path<Uuid>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -223,9 +201,8 @@ pub async fn get_bag(
 /// Updates a particular bag for a user.
 #[utoipa::path(
     post,
-    path = "/bags/{username}/{bag_id}",
+    path = "/bags/{bag_id}",
     params(
-        ("username" = String, Path, description = "A username"),
         ("bag_id" = String, Path, description = "A bag's UUID"),
     ),
     request_body = JsonValue::Object,
@@ -242,13 +219,12 @@ pub async fn get_bag(
 )]
 pub async fn update_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path((username, bag_id)): Path<(String, Uuid)>,
+    Extension(user_info): Extension<UserInfo>,
+    Path(bag_id): Path<Uuid>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -270,9 +246,8 @@ pub async fn update_bag(
 /// Deletes a particular bag for a user.
 #[utoipa::path(
     delete,
-    path = "/bags/{username}/{bag_id}",
+    path = "/bags/{bag_id}",
     params(
-        ("username" = String, Path, description = "A username"),
         ("bag_id" = String, Path, description = "A bag's UUID"),
     ),
     responses(
@@ -288,12 +263,11 @@ pub async fn update_bag(
 )]
 pub async fn delete_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path((username, bag_id)): Path<(String, Uuid)>,
+    Extension(user_info): Extension<UserInfo>,
+    Path(bag_id): Path<Uuid>,
 ) -> response::Result<(), DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -311,10 +285,7 @@ pub async fn delete_bag(
 /// Creates the default bag first if it doesn't exist.
 #[utoipa::path(
     get,
-    path = "/bags/{username}/default",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags/default",
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
         (status = 404, description = "The user was not found.", 
@@ -328,12 +299,10 @@ pub async fn delete_bag(
 )]
 pub async fn get_default_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -341,7 +310,7 @@ pub async fn get_default_bag(
 
     if !bags::has_default_bag(&mut tx, &user).await? {
         let new_bag: Map<String, JsonValue> = Map::new();
-        let new_bag_uuid = bags::add_user_bag(conn, &user, new_bag).await?;
+        let new_bag_uuid = bags::add_user_bag(&mut tx, &user, new_bag).await?;
         bags::set_default_bag(&mut tx, &user, &new_bag_uuid).await?;
     }
 
@@ -355,10 +324,7 @@ pub async fn get_default_bag(
 /// This will create the default bag if it doesn't exist,.
 #[utoipa::path(
     post,
-    path = "/bags/{username}/default",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags/default",
     request_body = JsonValue::Object,
     responses(
         (status = 200, description = "The user's default bag.", body = Bag),
@@ -373,13 +339,11 @@ pub async fn get_default_bag(
 )]
 pub async fn update_default_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
     Json(bag): Json<Map<String, JsonValue>>,
 ) -> response::Result<Json<Bag>, DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));
@@ -402,10 +366,7 @@ pub async fn update_default_bag(
 /// Deletes a user's default bag.
 #[utoipa::path(
     delete,
-    path = "/bags/{username}/default",
-    params(
-        ("username" = String, Path, description = "A username"),
-    ),
+    path = "/bags/default",
     responses(
         (status = 200, description = "The user's default bag was deleted."),
         (status = 404, description = "The user was not found.", 
@@ -419,12 +380,10 @@ pub async fn update_default_bag(
 )]
 pub async fn delete_default_bag(
     State(state): State<Arc<DiscoenvState>>,
-    Path(username): Path<String>,
+    Extension(user_info): Extension<UserInfo>,
 ) -> response::Result<(), DiscoError> {
-    let conn = &state.pool;
-    let cfg = &state.handler_config;
-    let user = common::fix_username(&username, cfg);
-    let mut tx = conn.begin().await?;
+    let user = common::fix_username(&user_info.preferred_username.unwrap_or_default(), &state.handler_config);
+    let mut tx = state.pool.begin().await?;
 
     if !users::username_exists(&mut tx, &user).await? {
         return Err(DiscoError::NotFound(format!("user {} was not found", user)));

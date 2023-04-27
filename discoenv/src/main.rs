@@ -13,7 +13,7 @@ use utoipa::{
 };
 use utoipa_swagger_ui::SwaggerUi;
 use discoenv::app_state::DiscoenvState;
-use discoenv::auth::{self, middleware::{auth_middleware, require_entitlements}};
+use discoenv::auth::{self, middleware::auth_middleware};
 use discoenv::errors;
 use discoenv::handlers;
 use discoenv::signals::shutdown_signal;
@@ -173,6 +173,8 @@ async fn main() {
 
     debug!("setting up routes");
     let service_state = Arc::new(state);
+    let auth_m = |s| middleware::from_fn_with_state(s, auth_middleware);
+    // let ent_m = |s: Arc<DiscoenvState>| middleware::from_fn_with_state(s, require_entitlements);
 
     let pref_routes = Router::new()
         .route(
@@ -221,17 +223,14 @@ async fn main() {
             get(handlers::bags::get_bag)
                 .post(handlers::bags::update_bag)
                 .delete(handlers::bags::delete_bag),
-        );
-
-    let auth_m = |s| middleware::from_fn_with_state(s, auth_middleware);
-    let ent_m = |s| middleware::from_fn_with_state(s, require_entitlements);
+        )
+        .layer(auth_m(service_state.clone()));
 
     let analyses_routes = Router::new()
         .route(
             "/",
             get(handlers::analyses::get_user_analyses)
         )
-        .layer(ent_m(service_state.clone()))
         .layer(auth_m(service_state.clone()));
 
     let app = Router::new()
