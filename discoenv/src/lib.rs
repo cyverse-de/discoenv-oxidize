@@ -15,6 +15,7 @@ pub mod db {
     pub mod preferences;
     pub mod searches;
     pub mod sessions;
+    pub mod tools;
     pub mod users;
 }
 
