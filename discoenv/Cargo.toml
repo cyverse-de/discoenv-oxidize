@@ -10,7 +10,7 @@ anyhow = "1.0.69"
 axum = { version = "0.6.10", features = ["headers", "http2", "macros", "multipart", "ws"] }
 axum-auth = { version = "0.4", default-features = false, features = ["auth-basic"] }
 clap = { version = "4.1.8", features = ["derive", "env"] }
-debuff = { git = "https://github.com/cyverse-de/p", rev="621d538d8e569d3e9d73716c7487aed760db075a" }
+debuff = { git = "https://github.com/cyverse-de/p", rev="17418d126cdb6aabdead4bc703cca27fbc8335da" }
 pbjson-types = "0.5.1"
 serde = { version = "1.0.154", features = ["derive", "serde_derive"] }
 serde_json = "1.0.94"

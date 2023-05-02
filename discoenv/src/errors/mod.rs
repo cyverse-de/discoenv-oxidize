@@ -2,7 +2,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use debuff::header;
 use debuff::svcerror::{ErrorCode, ServiceError};
 use reqwest;
 use serde_json::json;
@@ -206,7 +205,6 @@ impl From<DiscoError> for ServiceError {
         let message: String = d.msg();
 
         ServiceError {
-            header: Some(header::Header::default()),
             error_code,
             status_code,
             message,
@@ -246,7 +244,6 @@ mod test {
     #[test]
     fn test_discoerror() {
         let se = ServiceError {
-            header: Some(header::Header::default()),
             error_code: ErrorCode::Internal.into(),
             status_code: i32::from(StatusCode::INTERNAL_SERVER_ERROR.as_u16()),
             message: "this is a test internal server error".to_owned(),
