@@ -326,6 +326,146 @@
     },
     "query": "update bags set contents = $2 where id = $1"
   },
+  "7ab8db91d8a59b7e000dbe7f00608e5480205deb755e9cce27c5e09bda14430d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "location",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "description",
+          "ordinal": 3,
+          "type_info": "Text"
+        },
+        {
+          "name": "version",
+          "ordinal": 4,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "attribution",
+          "ordinal": 5,
+          "type_info": "Text"
+        },
+        {
+          "name": "time_limit_seconds",
+          "ordinal": 6,
+          "type_info": "Int4"
+        },
+        {
+          "name": "restricted",
+          "ordinal": 7,
+          "type_info": "Bool"
+        },
+        {
+          "name": "interactive",
+          "ordinal": 8,
+          "type_info": "Bool"
+        },
+        {
+          "name": "gpu_enabled",
+          "ordinal": 9,
+          "type_info": "Bool"
+        },
+        {
+          "name": "user_id",
+          "ordinal": 10,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "username",
+          "ordinal": 11,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "integration_data_id",
+          "ordinal": 12,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "integrator_name",
+          "ordinal": 13,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "integrator_email",
+          "ordinal": 14,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "container_image_id",
+          "ordinal": 15,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "container_image_name",
+          "ordinal": 16,
+          "type_info": "Text"
+        },
+        {
+          "name": "container_image_tag",
+          "ordinal": 17,
+          "type_info": "Text"
+        },
+        {
+          "name": "container_image_url",
+          "ordinal": 18,
+          "type_info": "Text"
+        },
+        {
+          "name": "container_image_deprecated",
+          "ordinal": 19,
+          "type_info": "Bool"
+        },
+        {
+          "name": "container_image_osg_image_path",
+          "ordinal": 20,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT\n                t.id,\n                t.name,\n                t.location,\n                t.description,\n                t.version,\n                t.attribution,\n                t.time_limit_seconds,\n                t.restricted,\n                t.interactive,\n                t.gpu_enabled,\n                u.id AS user_id,\n                u.username AS username,\n                t.integration_data_id,\n                i.integrator_name,\n                i.integrator_email,\n                c.id AS container_image_id,\n                c.name AS container_image_name,\n                c.tag AS container_image_tag,\n                c.url as container_image_url,\n                c.deprecated as container_image_deprecated,\n                c.osg_image_path as container_image_osg_image_path                \n            FROM tools t\n            JOIN container_images c ON t.container_images_id = c.id\n            JOIN integration_data i ON t.integration_data_id = i.id\n            JOIN users u ON i.user_id = u.id\n            WHERE\n                u.username = $1\n        "
+  },
   "85f9a5a811c82a8ecc2cc8ae5d136fc0923d47d0754281d588b8b797b0feed6a": {
     "describe": {
       "columns": [],
