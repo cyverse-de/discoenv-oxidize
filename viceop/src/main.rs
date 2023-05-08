@@ -1,10 +1,9 @@
-use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::apps::v1::Deployment;
-use k8s_openapi::api::core::v1::{ConfigMap, Service};
+use k8s_openapi::api::core::v1::ConfigMap;
 use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::ListParams;
 use kube::{
-    api::{Api, DeleteParams, Patch, PatchParams, ResourceExt},
+    api::{Api, ResourceExt},
     Client,
 };
 
