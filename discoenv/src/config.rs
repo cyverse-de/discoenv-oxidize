@@ -56,6 +56,7 @@ pub struct ConfigOauth {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub db: ConfigDB,
+    pub groups_db: ConfigDB,
     pub users: ConfigUsers,
     pub oauth: Option<ConfigOauth>,
 }

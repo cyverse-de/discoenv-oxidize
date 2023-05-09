@@ -33,6 +33,7 @@ cached = { version = "0.43.0", features = ["serde", "serde_json"] }
 chrono = { version = "0.4.24", features = ["serde"] }
 exitcode = "1.1.2"
 axum-server = { version = "0.4.7", features = ["tls-rustls", "tokio-rustls"] }
+itertools = "0.10.5"
 
 [dependencies.uuid]
 version = "1.1.2"

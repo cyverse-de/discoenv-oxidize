@@ -49,7 +49,11 @@ async fn main() {
         process::exit(exitcode::IOERR);
     });
 
-
+    debug!("connecting to groups db");
+    let groups_pool = PgPool::connect(&cfg.groups_db.uri).await.unwrap_or_else(|err| {
+        eprintln!("error connecting to the groups database: {err}");
+        process::exit(exitcode::IOERR);
+    });
 
     if cfg.oauth.is_none() {
         eprintln!("missing oauth configuration");
@@ -68,6 +72,7 @@ async fn main() {
 
     let mut state = DiscoenvState {
         pool,
+        groups_pool,
         handler_config,
         auth: auth::Authenticator::default(),
         admin_entitlements: vec![],
