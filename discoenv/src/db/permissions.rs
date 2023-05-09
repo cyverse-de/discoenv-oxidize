@@ -1,11 +1,16 @@
+use crate::db::groups;
 use debuff::groups::{Permission, PermissionList, ResourceOut, SubjectOut};
 use sqlx::query;
 
-pub async fn list_all_permissions<'a, E>(conn: E) -> Result<PermissionList, sqlx::Error>
+pub async fn list_all_permissions<'a, E, F>(
+    conn: E,
+    groups_conn: F,
+) -> Result<PermissionList, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+    F: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    let permissions = query!(
+    let mut permissions: Vec<Permission> = query!(
         r#"
             SELECT
                 p.id,
@@ -48,6 +53,8 @@ where
         }),
     })
     .collect();
+
+    groups::add_source_id(groups_conn, &mut permissions).await?;
 
     Ok(PermissionList { permissions })
 }
