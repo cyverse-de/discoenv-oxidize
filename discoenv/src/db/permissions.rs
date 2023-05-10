@@ -73,7 +73,7 @@ impl From<PermissionsOptionsRecord> for Permission {
 }
 
 // List the permissions for the provided resource.
-pub async fn list_resource_permissions<'a, E, F>(
+pub async fn resource_perms<'a, E, F>(
     conn: E,
     groups_conn: F,
     resource: &ResourceIn,
@@ -118,10 +118,7 @@ where
 }
 
 // List all of the permissions, and we do mean all of them. You probably don't want to call this.
-pub async fn list_all_permissions<'a, E, F>(
-    conn: E,
-    groups_conn: F,
-) -> Result<PermissionList, sqlx::Error>
+pub async fn list_perms<'a, E, F>(conn: E, groups_conn: F) -> Result<PermissionList, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
     F: sqlx::Executor<'a, Database = sqlx::Postgres>,
@@ -159,7 +156,7 @@ where
 }
 
 // Lists permissions for 1 or more subjects.
-pub async fn permissions_for_subjects<'a, E, F>(
+pub async fn subject_perms<'a, E, F>(
     conn: E,
     groups_conn: F,
     subject_ids: &[String],
@@ -202,20 +199,41 @@ where
     Ok(PermissionList { permissions })
 }
 
-pub async fn subject_min_level<'a, E, F>(
+// List permissions for subjects, optionally filtering the results by resource
+// type name and min level.
+pub async fn filtered_subject_perms<'a, E, F>(
     conn: E,
     groups_conn: F,
     subject_ids: &[String],
-    min_level: i32,
+    resource_name: Option<String>,
+    rt_name: Option<String>,
+    min_level: Option<i32>,
 ) -> Result<PermissionList, sqlx::Error>
 where
     E: sqlx::Executor<'a, Database = sqlx::Postgres>,
     F: sqlx::Executor<'a, Database = sqlx::Postgres>,
 {
-    let mut permission_list = permissions_for_subjects(conn, groups_conn, subject_ids).await?;
-    permission_list
-        .permissions
-        .retain(|p| p.permission_level <= min_level);
+    let mut l = subject_perms(conn, groups_conn, subject_ids).await?;
 
-    Ok(permission_list)
+    l.permissions.retain(|p| {
+        let mut should_retain: bool = false;
+
+        if let Some(r) = p.resource.as_ref() {
+            if let Some(rt) = rt_name.as_ref() {
+                should_retain = should_retain && (r.resource_type == *rt);
+            }
+
+            if let Some(rname) = resource_name.as_ref() {
+                should_retain = should_retain && (r.name == *rname);
+            }
+        }
+
+        if let Some(min) = min_level {
+            should_retain = should_retain && (p.permission_level <= min);
+        }
+
+        should_retain
+    });
+
+    Ok(l)
 }
