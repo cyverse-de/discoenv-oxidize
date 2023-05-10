@@ -1,6 +1,6 @@
 use crate::db::groups;
 use debuff::groups::{Permission, PermissionList, ResourceIn, ResourceOut, SubjectOut};
-use sqlx::{query, query_as};
+use sqlx::query_as;
 
 struct PermissionsRecord {
     id: uuid::Uuid,
@@ -36,6 +36,43 @@ impl From<PermissionsRecord> for Permission {
     }
 }
 
+// There are some queries that result in the fields returned being optional, so
+// this struct is included for use with those queries in the query_as! macro.
+struct PermissionsOptionsRecord {
+    id: Option<uuid::Uuid>,
+    internal_subject_id: Option<uuid::Uuid>,
+    subject_id: Option<String>,
+    subject_type: Option<String>,
+    resource_id: uuid::Uuid,
+    resource_name: Option<String>,
+    resource_type: Option<String>,
+    permission_level: Option<i32>,
+}
+
+impl From<PermissionsOptionsRecord> for Permission {
+    fn from(item: PermissionsOptionsRecord) -> Self {
+        Permission {
+            id: item.id.unwrap_or_default().to_string(),
+
+            permission_level: item.permission_level.unwrap_or_default(),
+
+            subject: Some(SubjectOut {
+                id: item.internal_subject_id.unwrap_or_default().to_string(),
+                subject_id: item.subject_id.unwrap_or_default(),
+                subject_type: item.subject_type.unwrap_or_default(),
+                subject_source_id: String::new(),
+            }),
+
+            resource: Some(ResourceOut {
+                id: item.resource_id.to_string(),
+                name: item.resource_name.unwrap_or_default(),
+                resource_type: item.resource_type.unwrap_or_default(),
+            }),
+        }
+    }
+}
+
+// List the permissions for the provided resource.
 pub async fn list_resource_permissions<'a, E, F>(
     conn: E,
     groups_conn: F,
@@ -80,6 +117,7 @@ where
     Ok(PermissionList { permissions })
 }
 
+// List all of the permissions, and we do mean all of them. You probably don't want to call this.
 pub async fn list_all_permissions<'a, E, F>(
     conn: E,
     groups_conn: F,
@@ -118,4 +156,66 @@ where
     groups::add_source_id(groups_conn, &mut permissions).await?;
 
     Ok(PermissionList { permissions })
+}
+
+// Lists permissions for 1 or more subjects.
+pub async fn permissions_for_subjects<'a, E, F>(
+    conn: E,
+    groups_conn: F,
+    subject_ids: &[String],
+) -> Result<PermissionList, sqlx::Error>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+    F: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    let mut permissions: Vec<Permission> = query_as!(
+        PermissionsOptionsRecord,
+        r#"
+            SELECT DISTINCT ON (r.id)
+	            first_value(p.id) OVER w AS id,
+	            first_value(s.id) OVER w AS internal_subject_id,
+	            first_value(s.subject_id) OVER w AS subject_id,
+	            first_value(s.subject_type) OVER w AS "subject_type: String",
+	            r.id AS resource_id,
+	            first_value(r.name) OVER w AS resource_name,
+	            first_value(rt.name) OVER w AS resource_type,
+	            first_value(pl.precedence) OVER w AS permission_level
+	        FROM permissions.permissions p
+	        JOIN permissions.permission_levels pl ON p.permission_level_id = pl.id
+	        JOIN permissions.subjects s ON p.subject_id = s.id
+	        JOIN permissions.resources r ON p.resource_id = r.id
+	        JOIN permissions.resource_types rt ON r.resource_type_id = rt.id
+	        WHERE s.subject_id = any($1)
+	        WINDOW w AS (PARTITION BY r.id ORDER BY pl.precedence)
+            ORDER BY r.id
+        "#,
+        subject_ids,
+    )
+    .fetch_all(conn)
+    .await?
+    .into_iter()
+    .map(|r| r.into())
+    .collect();
+
+    groups::add_source_id(groups_conn, &mut permissions).await?;
+
+    Ok(PermissionList { permissions })
+}
+
+pub async fn subject_min_level<'a, E, F>(
+    conn: E,
+    groups_conn: F,
+    subject_ids: &[String],
+    min_level: i32,
+) -> Result<PermissionList, sqlx::Error>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Postgres>,
+    F: sqlx::Executor<'a, Database = sqlx::Postgres>,
+{
+    let mut permission_list = permissions_for_subjects(conn, groups_conn, subject_ids).await?;
+    permission_list
+        .permissions
+        .retain(|p| p.permission_level <= min_level);
+
+    Ok(permission_list)
 }

@@ -306,6 +306,151 @@
     },
     "query": "\n            INSERT INTO user_saved_searches\n                (user_id, saved_searches)\n            VALUES\n                ((SELECT id FROM users WHERE username = $1), $2)\n            RETURNING id\n        "
   },
+  "297ca0c50d04d5b71244a98eba1d8c9f995e417a6965f8bc1fc328bfd33defb6": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "internal_subject_id",
+          "ordinal": 1,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "subject_id",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "subject_type: String",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "user",
+                  "group"
+                ]
+              },
+              "name": "subject_type_enum"
+            }
+          }
+        },
+        {
+          "name": "resource_id",
+          "ordinal": 4,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "resource_name",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "resource_type",
+          "ordinal": 6,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "permission_level",
+          "ordinal": 7,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text"
+        ]
+      }
+    },
+    "query": "\n            SELECT \n                p.id AS id,\n\t            s.id AS internal_subject_id,\n\t            s.subject_id AS subject_id,\n\t            s.subject_type AS \"subject_type: String\",\n\t            r.id AS resource_id,\n\t            r.name AS resource_name,\n\t            rt.name AS resource_type,\n\t            pl.precedence AS permission_level\n\t        FROM permissions.permissions p\n\t        JOIN permissions.permission_levels pl ON p.permission_level_id = pl.id\n\t        JOIN permissions.subjects s ON p.subject_id = s.id\n\t        JOIN permissions.resources r ON p.resource_id = r.id\n\t        JOIN permissions.resource_types rt ON r.resource_type_id = rt.id\n            WHERE rt.name = $1 \n            AND r.name = $2\n\t        ORDER BY s.subject_id\n        "
+  },
+  "2c2aa8803c6d2fc1d711211d0145b54f6936adad6e1a9ed5db2340d5e1cdbfdd": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "internal_subject_id",
+          "ordinal": 1,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "subject_id",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "subject_type: String",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "user",
+                  "group"
+                ]
+              },
+              "name": "subject_type_enum"
+            }
+          }
+        },
+        {
+          "name": "resource_id",
+          "ordinal": 4,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "resource_name",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "resource_type",
+          "ordinal": 6,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "permission_level",
+          "ordinal": 7,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        null,
+        null,
+        null,
+        null,
+        false,
+        null,
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      }
+    },
+    "query": "\n            SELECT DISTINCT ON (r.id)\n\t            first_value(p.id) OVER w AS id,\n\t            first_value(s.id) OVER w AS internal_subject_id,\n\t            first_value(s.subject_id) OVER w AS subject_id,\n\t            first_value(s.subject_type) OVER w AS \"subject_type: String\",\n\t            r.id AS resource_id,\n\t            first_value(r.name) OVER w AS resource_name,\n\t            first_value(rt.name) OVER w AS resource_type,\n\t            first_value(pl.precedence) OVER w AS permission_level\n\t        FROM permissions.permissions p\n\t        JOIN permissions.permission_levels pl ON p.permission_level_id = pl.id\n\t        JOIN permissions.subjects s ON p.subject_id = s.id\n\t        JOIN permissions.resources r ON p.resource_id = r.id\n\t        JOIN permissions.resource_types rt ON r.resource_type_id = rt.id\n\t        WHERE s.subject_id = any($1)\n\t        WINDOW w AS (PARTITION BY r.id ORDER BY pl.precedence)\n            ORDER BY r.id\n        "
+  },
   "32900ab90f07d8e8ff527c9cef615ac3d8b4e14bcbab9667c583b454341adc96": {
     "describe": {
       "columns": [
@@ -421,6 +566,76 @@
       }
     },
     "query": "select count(*) > 0 as has_user from users where username = $1"
+  },
+  "6929f40d162d4db2a8cdfca5580fc8de09390bcd8b696d77580ace7961454c9c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "internal_subject_id",
+          "ordinal": 1,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "subject_id",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "subject_type: String",
+          "ordinal": 3,
+          "type_info": {
+            "Custom": {
+              "kind": {
+                "Enum": [
+                  "user",
+                  "group"
+                ]
+              },
+              "name": "subject_type_enum"
+            }
+          }
+        },
+        {
+          "name": "resource_id",
+          "ordinal": 4,
+          "type_info": "Uuid"
+        },
+        {
+          "name": "resource_name",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "resource_type",
+          "ordinal": 6,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "permission_level",
+          "ordinal": 7,
+          "type_info": "Int4"
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "\n            SELECT\n                p.id,\n                s.id AS internal_subject_id,\n                s.subject_id,\n                s.subject_type AS \"subject_type: String\",\n                r.id as resource_id,\n                r.name as resource_name,\n                rt.name as resource_type,\n                pl.precedence as permission_level\n            FROM\n                permissions.permissions p\n            JOIN permissions.permission_levels pl ON p.permission_level_id = pl.id\n            JOIN permissions.subjects s ON p.subject_id = s.id\n            JOIN permissions.resources r ON p.resource_id = r.id\n            JOIN permissions.resource_types rt ON r.resource_type_id = rt.id\n            ORDER BY s.subject_id, r.name, pl.precedence\n        "
   },
   "6acdb76d612d61365fa4e5a2e09ddcbebc452a633d082096c88ae966947819a1": {
     "describe": {
@@ -976,82 +1191,6 @@
       }
     },
     "query": "\n            SELECT COUNT(*) > 0 AS has_saved_searches\n            FROM user_saved_searches\n            JOIN users ON user_saved_searches.user_id = users.id\n            WHERE users.username = $1\n        "
-  },
-  "ae41f16c15e123965e3d158228458c095b40a89eb0b586616e5b009c806d06d2": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Uuid"
-        },
-        {
-          "name": "internal_subject_id",
-          "ordinal": 1,
-          "type_info": "Uuid"
-        },
-        {
-          "name": "subject_id",
-          "ordinal": 2,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "subject_type: String",
-          "ordinal": 3,
-          "type_info": {
-            "Custom": {
-              "kind": {
-                "Enum": [
-                  "user",
-                  "group"
-                ]
-              },
-              "name": "subject_type_enum"
-            }
-          }
-        },
-        {
-          "name": "resource_id",
-          "ordinal": 4,
-          "type_info": "Uuid"
-        },
-        {
-          "name": "resource_name",
-          "ordinal": 5,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "resource_type_id",
-          "ordinal": 6,
-          "type_info": "Uuid"
-        },
-        {
-          "name": "resource_type_name",
-          "ordinal": 7,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "permission_level",
-          "ordinal": 8,
-          "type_info": "Int4"
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "\n            SELECT\n                p.id,\n                s.id AS internal_subject_id,\n                s.subject_id,\n                s.subject_type AS \"subject_type: String\",\n                r.id as resource_id,\n                r.name as resource_name,\n                rt.id as resource_type_id,\n                rt.name as resource_type_name,\n                pl.precedence as permission_level\n            FROM\n                permissions.permissions p\n            JOIN permissions.permission_levels pl ON p.permission_level_id = pl.id\n            JOIN permissions.subjects s ON p.subject_id = s.id\n            JOIN permissions.resources r ON p.resource_id = r.id\n            JOIN permissions.resource_types rt ON r.resource_type_id = rt.id\n            ORDER BY s.subject_id, r.name, pl.precedence\n        "
   },
   "b0e3e81682eb90df49f5b82e722a8aa53a6ac2cbc3c1e37ed410fc7ede279b33": {
     "describe": {
